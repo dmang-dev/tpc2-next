@@ -3,7 +3,7 @@
 All notable changes to TPC2 Next are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## Unreleased
+## 2.2.1 - 2026-10-21
 
 ### CI and supply chain
 

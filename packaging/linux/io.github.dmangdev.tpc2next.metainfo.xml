@@ -47,6 +47,7 @@
   </screenshots>
   <icon type="stock">tpc2-next</icon>
   <releases>
+    <release version="2.2.1" date="2026-10-21"/>
     <release version="2.2.0" date="2026-10-21"/>
     <release version="2.1.0" date="2026-10-20"/>
   </releases>

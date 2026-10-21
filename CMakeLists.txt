@@ -4,7 +4,7 @@ if(POLICY CMP0207)
     cmake_policy(SET CMP0207 NEW)
 endif()
 
-project(TPC2Next VERSION 2.2.0 LANGUAGES CXX)
+project(TPC2Next VERSION 2.2.1 LANGUAGES CXX)
 
 if(WIN32)
     enable_language(RC)
