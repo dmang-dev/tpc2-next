@@ -1,0 +1,185 @@
+name: Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to attach packages to
+        required: true
+        default: v2.1.0
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  linux:
+    name: Linux x86_64 package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build patchelf chrpath \
+            libgl1-mesa-dev libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
+            libxcb-xkb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0
+
+      - name: Install Qt 6.8
+        run: |
+          python3 -m venv "$RUNNER_TEMP/aqt"
+          "$RUNNER_TEMP/aqt/bin/pip" install --upgrade pip aqtinstall
+          "$RUNNER_TEMP/aqt/bin/aqt" install-qt \
+            linux desktop 6.8.3 linux_gcc_64 \
+            -m qtserialport -O "$RUNNER_TEMP/Qt"
+          echo "$RUNNER_TEMP/Qt/6.8.3/gcc_64/bin" >> "$GITHUB_PATH"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/Qt/6.8.3/gcc_64" \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage"
+
+      - name: Build and test
+        run: |
+          cmake --build build/release --parallel
+          ctest --test-dir build/release --output-on-failure
+
+      - name: Install
+        run: cmake --install build/release
+
+      - name: Inspect runtime
+        run: |
+          find stage -maxdepth 3 -type f | sort | sed -n '1,120p'
+          ldd stage/bin/tpc2
+          ldd stage/bin/tpc2cli
+
+      - name: Package
+        run: |
+          mkdir -p package
+          cp -a stage "package/TPC2-Next-2.1.0-linux-x86_64"
+          tar -C package -czf "TPC2-Next-2.1.0-linux-x86_64.tar.gz" \
+            "TPC2-Next-2.1.0-linux-x86_64"
+
+      - name: Smoke test package
+        run: |
+          rm -rf "$RUNNER_TEMP/tpc2-linux-smoke"
+          mkdir -p "$RUNNER_TEMP/tpc2-linux-smoke"
+          tar -xzf "TPC2-Next-2.1.0-linux-x86_64.tar.gz" \
+            -C "$RUNNER_TEMP/tpc2-linux-smoke"
+          app="$RUNNER_TEMP/tpc2-linux-smoke/TPC2-Next-2.1.0-linux-x86_64"
+          env -u LD_LIBRARY_PATH "$app/bin/tpc2cli" --backend demo info
+          set +e
+          env -u LD_LIBRARY_PATH QT_QPA_PLATFORM=offscreen \
+            timeout 5 "$app/bin/tpc2"
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            exit "$code"
+          fi
+
+      - name: Upload release asset
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "TPC2-Next-2.1.0-linux-x86_64.tar.gz" --clobber
+
+  macos:
+    name: macOS arm64 package
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: brew install cmake ninja qt
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage"
+
+      - name: Build and test
+        run: |
+          cmake --build build/release --parallel
+          ctest --test-dir build/release --output-on-failure
+
+      - name: Install
+        run: cmake --install build/release
+
+      - name: Inspect bundle
+        run: |
+          find stage -maxdepth 5 -type f | sort | sed -n '1,160p'
+          otool -L "stage/tpc2.app/Contents/MacOS/tpc2"
+          otool -L "stage/tpc2.app/Contents/MacOS/tpc2cli"
+          if otool -L "stage/tpc2.app/Contents/MacOS/tpc2cli" | grep -q '/opt/homebrew'; then
+            echo "CLI still links against Homebrew Qt" >&2
+            exit 1
+          fi
+
+      - name: Smoke test bundle
+        run: |
+          "stage/tpc2.app/Contents/MacOS/tpc2cli" --backend demo info
+          QT_QPA_PLATFORM=offscreen \
+            "stage/tpc2.app/Contents/MacOS/tpc2" &
+          pid=$!
+          sleep 4
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid"
+            echo "GUI exited during smoke test" >&2
+            exit 1
+          fi
+          kill "$pid"
+          wait "$pid" || true
+
+      - name: Create disk image
+        run: |
+          mkdir -p dmg
+          cp -a "stage/tpc2.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "TPC2 Next" -srcfolder dmg \
+            -ov -format UDZO "TPC2-Next-2.1.0-macos-arm64.dmg"
+
+      - name: Upload release asset
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            "TPC2-Next-2.1.0-macos-arm64.dmg" --clobber
+
+  checksums:
+    name: Refresh SHA256SUMS
+    needs: [linux, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download release assets
+        run: |
+          mkdir -p assets
+          gh release download "$RELEASE_TAG" --dir assets --clobber
+          rm -f assets/SHA256SUMS.txt
+
+      - name: Regenerate checksums
+        run: |
+          cd assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber

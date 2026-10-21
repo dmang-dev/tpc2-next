@@ -122,8 +122,30 @@ if(TPC2_BUILD_GUI AND Qt6Widgets_FOUND)
     target_link_libraries(tpc2 PRIVATE tpc2core Qt6::Core Qt6::Widgets Qt6::SerialPort)
     target_compile_options(tpc2 PRIVATE ${TPC2_WARNINGS})
     if(APPLE)
-        set_target_properties(tpc2 PROPERTIES MACOSX_BUNDLE TRUE)
+        set_target_properties(tpc2 PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_BUNDLE_NAME "TPC2 Next"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.dmangdev.tpc2next"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        )
     endif()
+endif()
+
+# The portable Linux package puts Qt libraries in ../lib and the macOS CLI
+# lives inside the app bundle, next to the bundled frameworks.
+if(APPLE)
+    if(TARGET tpc2cli)
+        set_target_properties(tpc2cli PROPERTIES
+            INSTALL_RPATH "@executable_path/../Frameworks")
+    endif()
+elseif(UNIX)
+    foreach(_target tpc2 tpc2cli)
+        if(TARGET ${_target})
+            set_target_properties(${_target} PROPERTIES
+                INSTALL_RPATH "$ORIGIN/../lib")
+        endif()
+    endforeach()
 endif()
 
 if(TPC2_BUILD_TESTS)
@@ -187,7 +209,13 @@ if(TARGET tpc2)
     )
 endif()
 if(TARGET tpc2cli)
-    install(TARGETS tpc2cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(APPLE AND TARGET tpc2)
+        # Keep the CLI inside the app bundle so it can use the bundled Qt
+        # frameworks without a separate runtime directory.
+        install(TARGETS tpc2cli RUNTIME DESTINATION "tpc2.app/Contents/MacOS")
+    else()
+        install(TARGETS tpc2cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 endif()
 
 # Bundle the Qt runtime with the GUI where the platform supports it. The CLI
@@ -208,6 +236,41 @@ if(TARGET tpc2 AND Qt6Widgets_FOUND)
             NO_UNSUPPORTED_PLATFORM_ERROR
         )
         install(SCRIPT ${tpc2_deploy_script})
+
+        if(APPLE)
+            # macdeployqt handles the app bundle. Add the CLI as an explicit
+            # executable so its Qt frameworks are rewritten to the bundle too.
+            find_program(TPC2_MACDEPLOYQT NAMES macdeployqt
+                HINTS "${_qt_prefix}/bin")
+            if(TPC2_MACDEPLOYQT)
+                install(CODE "
+                    execute_process(
+                        COMMAND \"${TPC2_MACDEPLOYQT}\"
+                            \"\${CMAKE_INSTALL_PREFIX}/tpc2.app\"
+                            -always-overwrite
+                            -executable=\"\${CMAKE_INSTALL_PREFIX}/tpc2.app/Contents/MacOS/tpc2cli\"
+                        RESULT_VARIABLE _tpc2_macdeployqt_result)
+                    if(NOT _tpc2_macdeployqt_result EQUAL 0)
+                        message(FATAL_ERROR
+                            \"macdeployqt failed with \${_tpc2_macdeployqt_result}\")
+                    endif()
+                ")
+            endif()
+
+            find_program(TPC2_CODESIGN NAMES codesign)
+            if(TPC2_CODESIGN)
+                install(CODE "
+                    execute_process(
+                        COMMAND \"${TPC2_CODESIGN}\" --force --deep --sign -
+                            \"\${CMAKE_INSTALL_PREFIX}/tpc2.app\"
+                        RESULT_VARIABLE _tpc2_codesign_result)
+                    if(NOT _tpc2_codesign_result EQUAL 0)
+                        message(FATAL_ERROR
+                            \"codesign failed with \${_tpc2_codesign_result}\")
+                    endif()
+                ")
+            endif()
+        endif()
     else()
         # OUTPUT_SCRIPT was added in Qt 6.5. Older Linux distributions ship
         # Qt 6.4, where the application uses the system Qt installation.
