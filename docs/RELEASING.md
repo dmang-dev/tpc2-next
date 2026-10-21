@@ -14,14 +14,14 @@ assets and checksums, and publishes the release only after all jobs succeed.
 4. Run the normal CI matrix and the formatting check.
 
 Use [Semantic Versioning](https://semver.org/). The tag must be `v` followed by
-the exact project version, for example `v2.2.0`. A pre-release tag such as
-`v2.2.0-rc1` is accepted when its base version matches `CMakeLists.txt`.
+the exact project version, for example `v2.2.1`. A pre-release tag such as
+`v2.2.1-rc1` is accepted when its base version matches `CMakeLists.txt`.
 
 ## Publish a tag
 
 ```sh
-git tag -a v2.2.0 -m "TPC2 Next 2.2.0"
-git push origin v2.2.0
+git tag -a v2.2.1 -m "TPC2 Next 2.2.1"
+git push origin v2.2.1
 ```
 
 The tag push starts the release workflow. It:
@@ -72,7 +72,7 @@ Download the assets and check them:
 
 ```sh
 sha256sum -c SHA256SUMS.txt
-gh attestation verify TPC2-Next-2.2.0-linux-x86_64.tar.gz \
+gh attestation verify TPC2-Next-2.2.1-linux-x86_64.tar.gz \
   --repo dmang-dev/tpc2-next
 ```
 

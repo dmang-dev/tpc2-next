@@ -29,30 +29,30 @@ shasum -a 256 -c SHA256SUMS.txt
 Windows (PowerShell):
 
 ```powershell
-Get-FileHash .\TPC2-Next-2.2.0-win64.zip -Algorithm SHA256
+Get-FileHash .\TPC2-Next-2.2.1-win64.zip -Algorithm SHA256
 # Compare the output with the matching line in SHA256SUMS.txt.
 ```
 
 If you use the GitHub CLI, you can also verify the build provenance attestation:
 
 ```sh
-gh attestation verify TPC2-Next-2.2.0-win64.zip \
+gh attestation verify TPC2-Next-2.2.1-win64.zip \
   --repo dmang-dev/tpc2-next
 ```
 
-Each release also includes `TPC2-Next-2.2.0.spdx.json`, an SPDX software bill
+Each release also includes `TPC2-Next-2.2.1.spdx.json`, an SPDX software bill
 of materials. It can be inspected with any SPDX-compatible tool, or with
 `jq`:
 
 ```sh
 jq '.packages[] | {name, versionInfo, licenseConcluded}' \
-  TPC2-Next-2.2.0.spdx.json
+  TPC2-Next-2.2.1.spdx.json
 ```
 
 ## Windows
 
-1. Extract `TPC2-Next-2.2.0-win64.zip`.
-2. Run `TPC2-Next-2.2.0-win64\bin\tpc2.exe`.
+1. Extract `TPC2-Next-2.2.1-win64.zip`.
+2. Run `TPC2-Next-2.2.1-win64\bin\tpc2.exe`.
 3. For scripted use, run `bin\tpc2cli.exe`.
 
 The ZIP is portable and does not need MSYS2 or a separate Qt installation.
@@ -77,9 +77,9 @@ Requirements:
 Extract and run:
 
 ```sh
-tar -xzf TPC2-Next-2.2.0-linux-x86_64.tar.gz
-./TPC2-Next-2.2.0-linux-x86_64/bin/tpc2
-./TPC2-Next-2.2.0-linux-x86_64/bin/tpc2cli --backend demo info
+tar -xzf TPC2-Next-2.2.1-linux-x86_64.tar.gz
+./TPC2-Next-2.2.1-linux-x86_64/bin/tpc2
+./TPC2-Next-2.2.1-linux-x86_64/bin/tpc2cli --backend demo info
 ```
 
 The GUI and CLI use the bundled Qt libraries in `lib/` and `plugins/`.
@@ -91,7 +91,7 @@ For a system-wide install:
 
 ```sh
 sudo mkdir -p /opt/tpc2-next
-sudo cp -a TPC2-Next-2.2.0-linux-x86_64/. /opt/tpc2-next/
+sudo cp -a TPC2-Next-2.2.1-linux-x86_64/. /opt/tpc2-next/
 sudo tee /usr/local/bin/tpc2 >/dev/null <<'EOF'
 #!/bin/sh
 exec /opt/tpc2-next/bin/tpc2 "$@"
@@ -128,7 +128,7 @@ Log out and back in after changing group membership. Some distributions use
 
 ## macOS
 
-1. Open `TPC2-Next-2.2.0-macos-universal.dmg`.
+1. Open `TPC2-Next-2.2.1-macos-universal.dmg`.
 2. Drag **TPC2 Next** to **Applications**.
 3. Launch it from Applications.
 
