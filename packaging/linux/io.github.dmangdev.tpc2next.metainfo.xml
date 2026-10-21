@@ -20,10 +20,6 @@
   <launchable type="desktop-id">tpc2-next.desktop</launchable>
   <url type="homepage">https://github.com/dmang-dev/tpc2-next</url>
   <url type="bugtracker">https://github.com/dmang-dev/tpc2-next/issues</url>
-  <url type="vcs-browser">https://github.com/dmang-dev/tpc2-next</url>
-  <developer id="io.github.dmangdev">
-    <name>TPC2 Next contributors</name>
-  </developer>
   <categories>
     <category>Utility</category>
     <category>Emulator</category>
