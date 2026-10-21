@@ -17,6 +17,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(TPC2_BUILD_GUI "Build the Qt desktop application" ON)
 option(TPC2_BUILD_CLI "Build the command line tool" ON)
 option(TPC2_BUILD_TESTS "Build the unit tests" ON)
+option(TPC2_BUILD_FUZZERS "Build libFuzzer targets (Clang only)" OFF)
+option(TPC2_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(TPC2_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(TPC2_ENABLE_COVERAGE "Enable GCC/Clang coverage instrumentation" OFF)
 option(TPC2_DEPLOY_BUILD_RUNTIME
     "Copy Windows runtime DLLs next to build-tree executables" ON)
 
@@ -31,8 +35,33 @@ endif()
 set(TPC2_WARNINGS "")
 if(MSVC)
     set(TPC2_WARNINGS /W4 /permissive- /utf-8)
+    if(TPC2_WARNINGS_AS_ERRORS)
+        list(APPEND TPC2_WARNINGS /WX)
+    endif()
 else()
     set(TPC2_WARNINGS -Wall -Wextra -Wpedantic -Wshadow)
+    if(TPC2_WARNINGS_AS_ERRORS)
+        list(APPEND TPC2_WARNINGS -Werror)
+    endif()
+endif()
+
+if(TPC2_SANITIZERS OR TPC2_BUILD_FUZZERS)
+    if(MSVC)
+        message(FATAL_ERROR "Sanitizer and fuzzer builds are not supported with MSVC")
+    endif()
+    add_compile_options(
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
+if(TPC2_ENABLE_COVERAGE)
+    if(MSVC)
+        message(FATAL_ERROR "TPC2_ENABLE_COVERAGE is not supported with MSVC")
+    endif()
+    add_compile_options(--coverage -O0 -g)
+    add_link_options(--coverage)
 endif()
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core SerialPort)
@@ -87,6 +116,8 @@ target_compile_options(tpc2core PRIVATE ${TPC2_WARNINGS})
 
 if(WIN32)
     target_sources(tpc2core PRIVATE src/platform/ParallelPortWindows.cpp)
+    set(TPC2_WINDOWS_ICON
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/tpc2-next.ico")
 elseif(APPLE)
     target_sources(tpc2core PRIVATE src/platform/ParallelPortMac.cpp)
 elseif(UNIX)
@@ -105,6 +136,14 @@ if(TPC2_BUILD_CLI)
     target_compile_options(tpc2cli PRIVATE ${TPC2_WARNINGS})
     if(WIN32)
         set_target_properties(tpc2cli PROPERTIES WIN32_EXECUTABLE FALSE)
+        set(TPC2_RC_INTERNAL_NAME "tpc2cli")
+        set(TPC2_RC_ORIGINAL_FILENAME "tpc2cli.exe")
+        set(TPC2_RC_FILE_DESCRIPTION "TPC2 Next command-line tool")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/tpc2.rc.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/tpc2cli.rc"
+            @ONLY)
+        target_sources(tpc2cli PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tpc2cli.rc")
     endif()
 endif()
 
@@ -134,6 +173,11 @@ if(TPC2_BUILD_GUI AND Qt6Widgets_FOUND)
             MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.dmangdev.tpc2next"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_COPYRIGHT
+                "Copyright (c) 2026 TPC2 Next contributors"
+            MACOSX_BUNDLE_ICON_FILE "tpc2-next.icns"
+            MACOSX_BUNDLE_INFO_PLIST
+                "${CMAKE_CURRENT_SOURCE_DIR}/packaging/macos/Info.plist.in"
         )
 
         # iconutil is part of the macOS developer tools. Generate the .icns
@@ -165,8 +209,9 @@ if(TPC2_BUILD_GUI AND Qt6Widgets_FOUND)
     endif()
 
     if(WIN32)
-        set(TPC2_WINDOWS_ICON
-            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/tpc2-next.ico")
+        set(TPC2_RC_INTERNAL_NAME "tpc2")
+        set(TPC2_RC_ORIGINAL_FILENAME "tpc2.exe")
+        set(TPC2_RC_FILE_DESCRIPTION "TPC2 Next")
         configure_file(
             "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/tpc2.rc.in"
             "${CMAKE_CURRENT_BINARY_DIR}/tpc2.rc"
@@ -201,6 +246,35 @@ if(TPC2_BUILD_TESTS)
     target_link_libraries(tpc2_tests PRIVATE tpc2core)
     target_compile_options(tpc2_tests PRIVATE ${TPC2_WARNINGS})
     add_test(NAME tpc2-tests COMMAND tpc2_tests)
+
+    if(TPC2_BUILD_CLI)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            add_test(
+                NAME tpc2-cli-integration
+                COMMAND "${Python3_EXECUTABLE}"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_integration.py"
+                    --exe "$<TARGET_FILE:tpc2cli>")
+            set_tests_properties(tpc2-cli-integration PROPERTIES TIMEOUT 60)
+        endif()
+    endif()
+endif()
+
+if(TPC2_BUILD_FUZZERS)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "TPC2_BUILD_FUZZERS requires Clang")
+    endif()
+    foreach(_fuzzer bridge_frame protocol)
+        add_executable(tpc2_fuzz_${_fuzzer} tests/fuzz/fuzz_${_fuzzer}.cpp)
+        target_link_libraries(tpc2_fuzz_${_fuzzer} PRIVATE tpc2core)
+        target_compile_options(tpc2_fuzz_${_fuzzer} PRIVATE
+            ${TPC2_WARNINGS}
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+            -fno-sanitize-recover=all)
+        target_link_options(tpc2_fuzz_${_fuzzer} PRIVATE
+            -fsanitize=fuzzer,address,undefined)
+    endforeach()
 endif()
 
 # Make the build-tree executables runnable by double-clicking on Windows. A
@@ -355,6 +429,8 @@ install(FILES firmware/pico/README.md
 if(UNIX AND NOT APPLE AND TARGET tpc2)
     install(FILES packaging/linux/tpc2-next.desktop
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/linux/io.github.dmangdev.tpc2next.metainfo.xml
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
     install(FILES packaging/icons/tpc2-next-256.png
         DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
         RENAME tpc2-next.png)

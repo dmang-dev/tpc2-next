@@ -3,6 +3,8 @@
 <img src="packaging/icons/tpc2-next-128.png" alt="TPC2 Next icon" width="96" align="right">
 
 [![CI](https://github.com/dmang-dev/tpc2-next/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dmang-dev/tpc2-next/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/dmang-dev/tpc2-next/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/dmang-dev/tpc2-next/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dmang-dev/tpc2-next/badge)](https://securityscorecards.dev/viewer/?uri=github.com/dmang-dev/tpc2-next)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/dmang-dev/tpc2-next?display_name=tag)](https://github.com/dmang-dev/tpc2-next/releases)
 
@@ -19,8 +21,8 @@ the [latest release](https://github.com/dmang-dev/tpc2-next/releases/latest).
 The packages include the Qt runtime; the Pico bridge firmware is published
 there too. See [`docs/INSTALL.md`](docs/INSTALL.md) for download,
 checksum, desktop-integration and Gatekeeper instructions. Releases include
-`SHA256SUMS.txt` and GitHub build provenance attestations; source-build
-instructions are below.
+`SHA256SUMS.txt`, an SPDX software bill of materials, and GitHub build
+provenance attestations; source-build instructions are below.
 
 ![TPC2 Next transfer page](docs/screenshots/transfer.png)
 
@@ -128,7 +130,8 @@ ctest --test-dir build/windows --output-on-failure
 ```
 
 The suite covers the handshake parser, CRC/framing, 8.3 names, upload and
-download, extended commands, cancellation and BIOS filenames.
+download, extended commands, cancellation and BIOS filenames. A separate CTest
+case exercises the CLI against the demo backend.
 
 ## Using the desktop app
 
