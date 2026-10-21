@@ -113,6 +113,24 @@ jobs:
         if: runner.os != 'Windows'
         run: ./build/ci/tpc2cli --backend demo info
 
+  metadata:
+    name: Linux metadata
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y appstream desktop-file-utils
+
+      - name: Validate desktop entry and AppStream metadata
+        run: |
+          desktop-file-validate packaging/linux/tpc2-next.desktop
+          appstreamcli validate --no-net \
+            packaging/linux/io.github.dmangdev.tpc2next.metainfo.xml
+
   sanitizers:
     name: ASan/UBSan
     runs-on: ubuntu-24.04
