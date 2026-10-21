@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload release asset
         run: |
-          gh release upload "$RELEASE_TAG" \
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             "TPC2-Next-2.1.0-linux-x86_64.tar.gz" --clobber
 
   macos:
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload release asset
         run: |
-          gh release upload "$RELEASE_TAG" \
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             "TPC2-Next-2.1.0-macos-arm64.dmg" --clobber
 
   checksums:
@@ -188,7 +188,8 @@ jobs:
       - name: Download release assets
         run: |
           mkdir -p assets
-          gh release download "$RELEASE_TAG" --dir assets --clobber
+          gh release download "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            --dir assets --clobber
           rm -f assets/SHA256SUMS.txt
 
       - name: Regenerate checksums
@@ -197,4 +198,5 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
-          gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            SHA256SUMS.txt --clobber
