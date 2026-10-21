@@ -25,6 +25,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag }}
 
       - name: Install build dependencies
         run: |
@@ -108,6 +110,8 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag }}
 
       - name: Install build dependencies
         run: brew install cmake ninja qt

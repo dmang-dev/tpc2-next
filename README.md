@@ -12,6 +12,11 @@ tool. It talks to a real V64 through a Raspberry Pi Pico USB bridge or a legacy
 parallel port, and it includes a built-in V64 simulator so every feature can be
 tried without hardware.
 
+Prebuilt Windows x64, Linux x86_64, and macOS arm64 packages are attached to the
+[latest release](https://github.com/dmang-dev/tpc2-next/releases/latest). The
+Linux and macOS packages include the Qt runtime; the Pico bridge firmware is
+published there too. Source-build instructions are below.
+
 ![TPC2 Next transfer page](docs/screenshots/transfer.png)
 
 ![TPC2 Next remote control page](docs/screenshots/remote.png)
