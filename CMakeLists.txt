@@ -238,38 +238,21 @@ if(TARGET tpc2 AND Qt6Widgets_FOUND)
         install(SCRIPT ${tpc2_deploy_script})
 
         if(APPLE)
-            # macdeployqt handles the app bundle. Add the CLI as an explicit
-            # executable so its Qt frameworks are rewritten to the bundle too.
-            find_program(TPC2_MACDEPLOYQT NAMES macdeployqt
-                HINTS "${_qt_prefix}/bin")
-            if(TPC2_MACDEPLOYQT)
-                install(CODE "
-                    execute_process(
-                        COMMAND \"${TPC2_MACDEPLOYQT}\"
-                            \"\${CMAKE_INSTALL_PREFIX}/tpc2.app\"
-                            -always-overwrite
-                            -executable=\"\${CMAKE_INSTALL_PREFIX}/tpc2.app/Contents/MacOS/tpc2cli\"
-                        RESULT_VARIABLE _tpc2_macdeployqt_result)
-                    if(NOT _tpc2_macdeployqt_result EQUAL 0)
-                        message(FATAL_ERROR
-                            \"macdeployqt failed with \${_tpc2_macdeployqt_result}\")
-                    endif()
-                ")
-            endif()
-
-            find_program(TPC2_CODESIGN NAMES codesign)
-            if(TPC2_CODESIGN)
-                install(CODE "
-                    execute_process(
-                        COMMAND \"${TPC2_CODESIGN}\" --force --deep --sign -
-                            \"\${CMAKE_INSTALL_PREFIX}/tpc2.app\"
-                        RESULT_VARIABLE _tpc2_codesign_result)
-                    if(NOT _tpc2_codesign_result EQUAL 0)
-                        message(FATAL_ERROR
-                            \"codesign failed with \${_tpc2_codesign_result}\")
-                    endif()
-                ")
-            endif()
+            # macdeployqt does not rewrite an extra executable placed inside
+            # the app bundle, so point the CLI at the bundled frameworks and
+            # then sign the complete bundle.
+            install(SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FixMacCli.cmake")
+        elseif(UNIX)
+            # The generic Qt deploy tool copies Qt libraries but not the
+            # platform plugins on Linux. Include the platform plugins (and
+            # the Qt libraries they need) so the package is self-contained.
+            install(DIRECTORY "${_qt_prefix}/plugins/platforms"
+                DESTINATION plugins)
+            install(DIRECTORY "${_qt_prefix}/plugins/styles"
+                DESTINATION plugins OPTIONAL)
+            install(DIRECTORY "${_qt_prefix}/lib/"
+                DESTINATION lib
+                FILES_MATCHING PATTERN "libQt6*.so.6*")
         endif()
     else()
         # OUTPUT_SCRIPT was added in Qt 6.5. Older Linux distributions ship

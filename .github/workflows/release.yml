@@ -34,7 +34,8 @@ jobs:
             libgl1-mesa-dev libxkbcommon-x11-0 libxcb-cursor0 \
             libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
-            libxcb-xkb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0
+            libxcb-xkb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 \
+            xvfb
 
       - name: Install Qt 6.8
         run: |
@@ -62,9 +63,12 @@ jobs:
 
       - name: Inspect runtime
         run: |
-          find stage -maxdepth 3 -type f | sort | sed -n '1,120p'
+          find stage -maxdepth 4 -type f | sort | sed -n '1,160p'
+          test -f stage/plugins/platforms/libqxcb.so
+          test -f stage/plugins/platforms/libqoffscreen.so
           ldd stage/bin/tpc2
           ldd stage/bin/tpc2cli
+          ldd stage/plugins/platforms/libqxcb.so
 
       - name: Package
         run: |
@@ -82,7 +86,7 @@ jobs:
           app="$RUNNER_TEMP/tpc2-linux-smoke/TPC2-Next-2.1.0-linux-x86_64"
           env -u LD_LIBRARY_PATH "$app/bin/tpc2cli" --backend demo info
           set +e
-          env -u LD_LIBRARY_PATH QT_QPA_PLATFORM=offscreen \
+          xvfb-run -a env -u LD_LIBRARY_PATH \
             timeout 5 "$app/bin/tpc2"
           code=$?
           set -e
