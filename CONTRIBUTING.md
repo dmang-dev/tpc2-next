@@ -34,7 +34,31 @@ python scripts/check-format.py
 ```
 
 The GitHub Actions matrix builds and tests Windows/MSYS2, Ubuntu, and macOS.
-CodeQL runs on pushes, pull requests and a weekly schedule.
+It also runs ASan/UBSan, coverage, protocol fuzz smoke tests, and a Pico
+firmware build. CodeQL and OpenSSF Scorecard run on pushes, pull requests and
+a weekly schedule.
+
+To reproduce the sanitizer and fuzzer checks locally on Linux or macOS:
+
+```sh
+# AddressSanitizer + UndefinedBehaviorSanitizer
+cmake -S . -B build/sanitizers -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DTPC2_SANITIZERS=ON \
+  -DTPC2_BUILD_GUI=OFF -DTPC2_BUILD_CLI=OFF
+cmake --build build/sanitizers --parallel
+ctest --test-dir build/sanitizers --output-on-failure
+
+# libFuzzer targets (Clang only)
+CC=clang CXX=clang++ cmake -S . -B build/fuzz -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DTPC2_BUILD_FUZZERS=ON \
+  -DTPC2_BUILD_GUI=OFF -DTPC2_BUILD_CLI=OFF -DTPC2_BUILD_TESTS=OFF
+cmake --build build/fuzz --parallel \
+  --target tpc2_fuzz_bridge_frame tpc2_fuzz_protocol
+./build/fuzz/tpc2_fuzz_bridge_frame -max_total_time=60
+./build/fuzz/tpc2_fuzz_protocol -max_total_time=60
+```
 
 Application icons are generated from `packaging/icons/tpc2-next.svg` with
 `python scripts/generate-icons.py` (requires Pillow). Commit the generated PNG,

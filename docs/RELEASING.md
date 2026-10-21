@@ -30,7 +30,7 @@ The tag push starts the release workflow. It:
 2. Creates a draft release if one does not exist.
 3. Builds the Windows, Linux, macOS universal and Pico firmware assets.
 4. Runs the unit tests and package smoke tests.
-5. Generates build provenance attestations for the assets.
+5. Generates an SPDX SBOM and build provenance attestations for the assets.
 6. Regenerates `SHA256SUMS.txt`.
 7. Publishes the draft release.
 
@@ -82,6 +82,7 @@ The release assets are:
 - `TPC2-Next-<version>-linux-x86_64.tar.gz`
 - `TPC2-Next-<version>-macos-universal.dmg`
 - `tpc2_bridge.uf2`
+- `TPC2-Next-<version>.spdx.json`
 - `SHA256SUMS.txt`
 
 ## Notes
@@ -91,5 +92,8 @@ The release assets are:
 - The macOS package is built with the official Qt 6.8.3 macOS package and is
   universal (`arm64` and `x86_64`), targeting macOS 12 or newer.
 - The Pico firmware is built from `firmware/pico` with Pico SDK 2.1.1.
-- Branch protection should require the CI `build` and `format` jobs before a
-  release commit reaches `main`.
+- `main` is protected by a repository ruleset that requires a pull request and
+  the CI, CodeQL, and dependency-review checks. The `v*` tag ruleset prevents
+  tag deletion or movement after a release is published.
+- GitHub Actions references are pinned to commit SHAs; Dependabot updates the
+  pins and groups action updates into a single pull request.

@@ -30,7 +30,7 @@ jobs:
             os: macos-14
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -46,7 +46,7 @@ jobs:
 
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         with:
           msystem: UCRT64
           update: true
@@ -65,6 +65,7 @@ jobs:
           cmake -S . -B build/ci -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64
+          -DTPC2_WARNINGS_AS_ERRORS=ON
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -89,7 +90,8 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             extra=(-DCMAKE_PREFIX_PATH="$(brew --prefix qt)")
           fi
-          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release "${extra[@]}"
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DTPC2_WARNINGS_AS_ERRORS=ON "${extra[@]}"
 
       - name: Build (Unix)
         if: runner.os != 'Windows'
@@ -103,11 +105,150 @@ jobs:
         if: runner.os != 'Windows'
         run: ./build/ci/tpc2cli --backend demo info
 
+  sanitizers:
+    name: ASan/UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            qt6-base-dev qt6-serialport-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/sanitizers -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DTPC2_SANITIZERS=ON \
+            -DTPC2_WARNINGS_AS_ERRORS=ON \
+            -DTPC2_BUILD_GUI=OFF \
+            -DTPC2_BUILD_CLI=OFF
+
+      - name: Build
+        run: cmake --build build/sanitizers --parallel
+
+      - name: Test
+        run: ctest --test-dir build/sanitizers --output-on-failure
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build gcovr \
+            qt6-base-dev qt6-serialport-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/coverage -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DTPC2_ENABLE_COVERAGE=ON \
+            -DTPC2_WARNINGS_AS_ERRORS=ON \
+            -DTPC2_BUILD_GUI=OFF \
+            -DTPC2_BUILD_CLI=OFF
+
+      - name: Build and test
+        run: |
+          cmake --build build/coverage --parallel
+          ctest --test-dir build/coverage --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          gcovr --root . --exclude 'build/' --exclude 'tests/' \
+            --xml-pretty --output coverage.xml
+          gcovr --root . --exclude 'build/' --exclude 'tests/' \
+            --txt | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: coverage.xml
+          retention-days: 7
+
+  fuzz:
+    name: Fuzz smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build \
+            qt6-base-dev qt6-serialport-dev
+
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          cmake -S . -B build/fuzz -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DTPC2_BUILD_FUZZERS=ON \
+            -DTPC2_WARNINGS_AS_ERRORS=ON \
+            -DTPC2_BUILD_GUI=OFF \
+            -DTPC2_BUILD_CLI=OFF \
+            -DTPC2_BUILD_TESTS=OFF
+
+      - name: Build fuzzers
+        run: |
+          cmake --build build/fuzz --parallel \
+            --target tpc2_fuzz_bridge_frame tpc2_fuzz_protocol
+
+      - name: Run fuzzers
+        run: |
+          ./build/fuzz/tpc2_fuzz_bridge_frame \
+            -max_total_time=15 -print_final_stats=1
+          ./build/fuzz/tpc2_fuzz_protocol \
+            -max_total_time=15 -print_final_stats=1
+
+  firmware:
+    name: Pico firmware
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            python3
+
+      - name: Fetch Pico SDK
+        run: |
+          git clone --depth 1 --branch 2.1.1 --recurse-submodules \
+            https://github.com/raspberrypi/pico-sdk.git \
+            "$RUNNER_TEMP/pico-sdk"
+
+      - name: Build firmware
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S firmware/pico -B build/firmware -G Ninja \
+            -DPICO_BOARD=pico -DPICO_NO_PICOTOOL=1
+          cmake --build build/firmware --parallel
+          test -f build/firmware/tpc2_bridge.uf2
+
   format:
     name: Formatting
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Check tracked files
         run: python3 scripts/check-format.py

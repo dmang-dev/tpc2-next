@@ -3,7 +3,28 @@
 All notable changes to TPC2 Next are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## 2.2.0 — 2026-10-21
+## Unreleased
+
+### CI and supply chain
+
+- CI now treats compiler warnings as errors, runs ASan/UBSan, generates a
+  coverage report, builds the Pico firmware, and runs short libFuzzer smoke
+  tests for bridge framing and 8.3 filename handling.
+- GitHub Actions are pinned to commit SHAs and grouped Dependabot updates keep
+  them current.
+- Added OpenSSF Scorecard, dependency review, and SPDX SBOM generation for
+  releases.
+- Added a CLI integration test that exercises the demo backend end to end.
+
+### Packaging
+
+- Added AppStream metadata for Linux software centers and validated the
+  desktop entry and metadata during release packaging.
+- Windows executables now embed version information in addition to the icon.
+- macOS bundles now include category, high-DPI, minimum-version, and copyright
+  metadata in `Info.plist`.
+
+## 2.2.0 - 2026-10-21
 
 ### Release packaging
 

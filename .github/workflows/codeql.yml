@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install build dependencies
         run: |
@@ -34,7 +34,7 @@ jobs:
             qt6-base-dev qt6-serialport-dev
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         with:
           languages: c-cpp
           build-mode: manual
@@ -43,12 +43,13 @@ jobs:
         run: |
           cmake -S . -B build/codeql -G Ninja \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-            -DTPC2_BUILD_TESTS=ON
+            -DTPC2_BUILD_TESTS=ON \
+            -DTPC2_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/codeql --parallel 2
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         with:
           category: /language:c-cpp

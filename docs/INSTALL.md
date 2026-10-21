@@ -40,6 +40,15 @@ gh attestation verify TPC2-Next-2.2.0-win64.zip \
   --repo dmang-dev/tpc2-next
 ```
 
+Each release also includes `TPC2-Next-2.2.0.spdx.json`, an SPDX software bill
+of materials. It can be inspected with any SPDX-compatible tool, or with
+`jq`:
+
+```sh
+jq '.packages[] | {name, versionInfo, licenseConcluded}' \
+  TPC2-Next-2.2.0.spdx.json
+```
+
 ## Windows
 
 1. Extract `TPC2-Next-2.2.0-win64.zip`.

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.dmangdev.tpc2next</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>TPC2 Next</name>
+  <summary>Upload, download and remote-control a Doctor V64</summary>
+  <description>
+    <p>
+      TPC2 Next is a modern replacement for Bung's TPC2.EXE upload/download
+      tool and V64IO2.EXE remote-control utility for the Doctor V64.
+    </p>
+    <p>
+      It supports the Pico USB bridge, legacy parallel-port connections and a
+      built-in demo device. The GUI and CLI can upload and download files,
+      read and write V64 memory, call 6502 routines and print text on the V64
+      on-screen display.
+    </p>
+  </description>
+  <launchable type="desktop-id">tpc2-next.desktop</launchable>
+  <url type="homepage">https://github.com/dmang-dev/tpc2-next</url>
+  <url type="bugtracker">https://github.com/dmang-dev/tpc2-next/issues</url>
+  <url type="vcs-browser">https://github.com/dmang-dev/tpc2-next</url>
+  <developer id="io.github.dmangdev">
+    <name>TPC2 Next contributors</name>
+  </developer>
+  <categories>
+    <category>Utility</category>
+    <category>Emulator</category>
+  </categories>
+  <keywords>
+    <keyword>Doctor V64</keyword>
+    <keyword>N64</keyword>
+    <keyword>TPC2</keyword>
+    <keyword>V64</keyword>
+    <keyword>GD6</keyword>
+  </keywords>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Transfer files to and from a Doctor V64</caption>
+      <image type="source">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/transfer.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Read memory, call routines and print OSD text</caption>
+      <image type="source">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/remote.png</image>
+    </screenshot>
+  </screenshots>
+  <icon type="stock">tpc2-next</icon>
+  <releases>
+    <release version="2.2.0" date="2026-10-21"/>
+    <release version="2.1.0" date="2026-10-20"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>
