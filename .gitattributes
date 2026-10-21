@@ -1,0 +1,17 @@
+* text=auto
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+*.cmake text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.editorconfig text eol=lf
+CMakeLists.txt text eol=lf
+*.zip binary
+*.png binary
+*.uf2 binary
+*.bin binary
+*.elf binary

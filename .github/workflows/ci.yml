@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows / MSYS2 UCRT64
+            os: windows-latest
+          - name: Linux / Ubuntu
+            os: ubuntu-24.04
+          - name: macOS / Homebrew
+            os: macos-14
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build \
+            qt6-base-dev qt6-serialport-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja qt
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-serialport
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: >
+          cmake -S . -B build/ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: cmake --build build/ci --parallel
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ctest --test-dir build/ci --output-on-failure
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: ./build/ci/tpc2cli.exe --backend demo info
+
+      - name: Configure (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          extra=()
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            extra=(-DCMAKE_PREFIX_PATH="$(brew --prefix qt)")
+          fi
+          cmake -S . -B build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release "${extra[@]}"
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
+        run: cmake --build build/ci --parallel
+
+      - name: Test (Unix)
+        if: runner.os != 'Windows'
+        run: ctest --test-dir build/ci --output-on-failure
+
+      - name: Smoke test (Unix)
+        if: runner.os != 'Windows'
+        run: ./build/ci/tpc2cli --backend demo info
+
+  format:
+    name: Formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check tracked files
+        run: python3 scripts/check-format.py

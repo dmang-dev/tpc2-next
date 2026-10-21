@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting and build documentation
+    url: https://github.com/dmang-dev/tpc2-next#troubleshooting
+    about: Check the README before opening an issue.
+  - name: Security report
+    url: https://github.com/dmang-dev/tpc2-next/security/policy
+    about: Please report vulnerabilities privately.

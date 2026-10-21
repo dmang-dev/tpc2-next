@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest an improvement or a new capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: What would you like TPC2 Next to do?
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Explain the workflow this would improve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behaviour or interface you have in mind.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - GUI
+        - CLI
+        - Protocol / transfer
+        - Pico firmware
+        - Parallel-port backend
+        - Documentation
+        - Build / packaging
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Compatibility
+      options:
+        - label: This request preserves the original TPC2/GD6 and V64IO2 protocol behaviour.
+          required: true

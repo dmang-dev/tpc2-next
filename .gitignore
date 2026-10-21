@@ -1,0 +1,14 @@
+build/
+_extract/
+legacy/
+dist/
+*.zip
+*.bin
+*.uf2
+*.elf
+*.exe
+*.dll
+*.user
+CMakeUserPresets.json
+.DS_Store
+Thumbs.db

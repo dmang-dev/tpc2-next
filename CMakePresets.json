@@ -1,0 +1,56 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "windows-msys2",
+      "displayName": "Windows / MSYS2 MinGW64",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "C:/msys64/mingw64"
+      }
+    },
+    {
+      "name": "linux",
+      "displayName": "Linux",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "macos",
+      "displayName": "macOS (Homebrew Qt)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "/opt/homebrew/opt/qt"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-msys2", "configurePreset": "windows-msys2" },
+    { "name": "linux", "configurePreset": "linux" },
+    { "name": "macos", "configurePreset": "macos" }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-msys2",
+      "configurePreset": "windows-msys2",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux",
+      "configurePreset": "linux",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "macos",
+      "configurePreset": "macos",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}
