@@ -174,7 +174,7 @@ jobs:
           fi
 
       - name: Attest package provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: TPC2-Next-${{ env.VERSION }}-linux-x86_64.tar.gz
 
@@ -265,7 +265,7 @@ jobs:
           )
 
       - name: Attest package provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: TPC2-Next-${{ env.VERSION }}-win64.zip
 
@@ -454,7 +454,7 @@ jobs:
           xcrun stapler validate "$DMG"
 
       - name: Attest package provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: TPC2-Next-${{ env.VERSION }}-macos-universal.dmg
 
@@ -500,7 +500,7 @@ jobs:
           cp build/firmware/tpc2_bridge.uf2 tpc2_bridge.uf2
 
       - name: Attest firmware provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: tpc2_bridge.uf2
 
