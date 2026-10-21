@@ -137,13 +137,9 @@ jobs:
             exit 1
           fi
 
-      - name: Add headless platform plugin
+      - name: Trim optional plugins
         run: |
           app="stage/tpc2.app"
-          plugin="$(find "$(brew --prefix qt)" -name libqoffscreen.dylib -print -quit)"
-          test -n "$plugin"
-          mkdir -p "$app/Contents/PlugIns/platforms"
-          cp "$plugin" "$app/Contents/PlugIns/platforms/"
           # Optional plugins whose Qt modules are not part of Homebrew's
           # default Qt install would otherwise fail to load at runtime.
           rm -f "$app/Contents/PlugIns/imageformats/libqpdf.dylib"
@@ -155,7 +151,7 @@ jobs:
       - name: Smoke test bundle
         run: |
           "stage/tpc2.app/Contents/MacOS/tpc2cli" --backend demo info
-          QT_QPA_PLATFORM=offscreen \
+          QT_QPA_PLATFORM=cocoa \
             "stage/tpc2.app/Contents/MacOS/tpc2" &
           pid=$!
           sleep 4
