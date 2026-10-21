@@ -38,11 +38,11 @@
   <screenshots>
     <screenshot type="default">
       <caption>Transfer files to and from a Doctor V64</caption>
-      <image type="source">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/transfer.png</image>
+      <image type="source" width="1200" height="880">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/transfer.png</image>
     </screenshot>
     <screenshot>
       <caption>Read memory, call routines and print OSD text</caption>
-      <image type="source">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/remote.png</image>
+      <image type="source" width="1200" height="880">https://raw.githubusercontent.com/dmang-dev/tpc2-next/main/docs/screenshots/remote.png</image>
     </screenshot>
   </screenshots>
   <icon type="stock">tpc2-next</icon>

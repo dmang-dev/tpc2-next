@@ -38,7 +38,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake ninja-build \
+            appstream desktop-file-utils \
             qt6-base-dev qt6-serialport-dev
+
+      - name: Validate Linux metadata
+        if: runner.os == 'Linux'
+        run: |
+          desktop-file-validate packaging/linux/tpc2-next.desktop
+          appstreamcli validate --no-net \
+            packaging/linux/io.github.dmangdev.tpc2next.metainfo.xml
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
