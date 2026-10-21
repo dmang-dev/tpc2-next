@@ -137,6 +137,21 @@ jobs:
             exit 1
           fi
 
+      - name: Add headless platform plugin
+        run: |
+          app="stage/tpc2.app"
+          plugin="$(find "$(brew --prefix qt)" -name libqoffscreen.dylib -print -quit)"
+          test -n "$plugin"
+          mkdir -p "$app/Contents/PlugIns/platforms"
+          cp "$plugin" "$app/Contents/PlugIns/platforms/"
+          # Optional plugins whose Qt modules are not part of Homebrew's
+          # default Qt install would otherwise fail to load at runtime.
+          rm -f "$app/Contents/PlugIns/imageformats/libqpdf.dylib"
+          rm -f "$app/Contents/PlugIns/imageformats/libqsvg.dylib"
+          rm -f "$app/Contents/PlugIns/iconengines/libqsvgicon.dylib"
+          rm -f "$app/Contents/PlugIns/platforminputcontexts/libqtvirtualkeyboardplugin.dylib"
+          codesign --force --deep --sign - "$app"
+
       - name: Smoke test bundle
         run: |
           "stage/tpc2.app/Contents/MacOS/tpc2cli" --backend demo info
