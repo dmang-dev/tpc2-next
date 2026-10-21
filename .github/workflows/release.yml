@@ -1,43 +1,118 @@
 name: Release packages
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to attach packages to
+        description: Existing release tag (for example v2.2.0)
         required: true
-        default: v2.1.0
+        type: string
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 concurrency:
-  group: release-${{ github.event.inputs.tag }}
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
 jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Validate tag and project version
+        id: version
+        shell: bash
+        run: |
+          tag="$RELEASE_TAG"
+          case "$tag" in
+            v[0-9]*) ;;
+            *)
+              echo "Release tag must start with v and a version number: $tag" >&2
+              exit 1
+              ;;
+          esac
+
+          version="${tag#v}"
+          base_version="${version%%-*}"
+          project_version="$(sed -n \
+            's/^project(TPC2Next VERSION \([0-9][0-9.]*\).*/\1/p' \
+            CMakeLists.txt)"
+          if [ -z "$project_version" ]; then
+            echo "Could not read the project version from CMakeLists.txt" >&2
+            exit 1
+          fi
+          if [ "$base_version" != "$project_version" ]; then
+            echo "Tag $tag does not match CMake project version $project_version" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+              >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists"
+            exit 0
+          fi
+          args=(--title "TPC2 Next $VERSION" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            --draft "${args[@]}"
+
   linux:
     name: Linux x86_64 package
-    runs-on: ubuntu-24.04
+    needs: validate
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
-      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ needs.validate.outputs.tag }}
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake ninja-build patchelf chrpath \
-            libgl1-mesa-dev libxkbcommon-x11-0 libxcb-cursor0 \
-            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 \
-            libxcb-xkb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 \
-            xvfb
+            python3-venv libgl1-mesa-dev libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-xkb1 libxcb-randr0 \
+            libxcb-sync1 libxcb-xfixes0 xvfb
 
       - name: Install Qt 6.8
         run: |
@@ -65,9 +140,11 @@ jobs:
 
       - name: Inspect runtime
         run: |
-          find stage -maxdepth 4 -type f | sort | sed -n '1,160p'
+          find stage -maxdepth 4 -type f | sort | sed -n '1,180p'
           test -f stage/plugins/platforms/libqxcb.so
           test -f stage/plugins/platforms/libqoffscreen.so
+          test -f stage/share/applications/tpc2-next.desktop
+          test -f stage/share/icons/hicolor/256x256/apps/tpc2-next.png
           ldd stage/bin/tpc2
           ldd stage/bin/tpc2cli
           ldd stage/plugins/platforms/libqxcb.so
@@ -75,17 +152,17 @@ jobs:
       - name: Package
         run: |
           mkdir -p package
-          cp -a stage "package/TPC2-Next-2.1.0-linux-x86_64"
-          tar -C package -czf "TPC2-Next-2.1.0-linux-x86_64.tar.gz" \
-            "TPC2-Next-2.1.0-linux-x86_64"
+          cp -a stage "package/TPC2-Next-${VERSION}-linux-x86_64"
+          tar -C package -czf "TPC2-Next-${VERSION}-linux-x86_64.tar.gz" \
+            "TPC2-Next-${VERSION}-linux-x86_64"
 
       - name: Smoke test package
         run: |
           rm -rf "$RUNNER_TEMP/tpc2-linux-smoke"
           mkdir -p "$RUNNER_TEMP/tpc2-linux-smoke"
-          tar -xzf "TPC2-Next-2.1.0-linux-x86_64.tar.gz" \
+          tar -xzf "TPC2-Next-${VERSION}-linux-x86_64.tar.gz" \
             -C "$RUNNER_TEMP/tpc2-linux-smoke"
-          app="$RUNNER_TEMP/tpc2-linux-smoke/TPC2-Next-2.1.0-linux-x86_64"
+          app="$RUNNER_TEMP/tpc2-linux-smoke/TPC2-Next-${VERSION}-linux-x86_64"
           env -u LD_LIBRARY_PATH "$app/bin/tpc2cli" --backend demo info
           set +e
           xvfb-run -a env -u LD_LIBRARY_PATH \
@@ -96,32 +173,140 @@ jobs:
             exit "$code"
           fi
 
+      - name: Attest package provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: TPC2-Next-${{ env.VERSION }}-linux-x86_64.tar.gz
+
       - name: Upload release asset
         run: |
           gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
-            "TPC2-Next-2.1.0-linux-x86_64.tar.gz" --clobber
+            "TPC2-Next-${VERSION}-linux-x86_64.tar.gz" --clobber
 
-  macos:
-    name: macOS arm64 package
-    runs-on: macos-14
+  windows:
+    name: Windows x64 package
+    needs: validate
+    runs-on: windows-latest
     timeout-minutes: 45
     env:
-      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      VERSION: ${{ needs.validate.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.inputs.tag }}
+          ref: ${{ needs.validate.outputs.tag }}
 
       - name: Install build dependencies
-        run: brew install cmake ninja qt
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-serialport
+
+      - name: Configure
+        shell: msys2 {0}
+        run: >
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64
+          -DCMAKE_INSTALL_PREFIX="$(cygpath -m "$PWD/stage")"
+
+      - name: Build and test
+        shell: msys2 {0}
+        run: |
+          cmake --build build/release --parallel
+          ctest --test-dir build/release --output-on-failure
+
+      - name: Install
+        shell: msys2 {0}
+        run: cmake --install build/release
+
+      - name: Inspect runtime
+        shell: msys2 {0}
+        run: |
+          find stage -maxdepth 3 -type f | sort | sed -n '1,180p'
+          test -f stage/bin/tpc2.exe
+          test -f stage/bin/tpc2cli.exe
+          test -f stage/bin/Qt6Core.dll
+          test -f stage/share/qt6/plugins/platforms/qwindows.dll
+
+      - name: Package
+        shell: msys2 {0}
+        run: |
+          mkdir -p package
+          cp -a stage "package/TPC2-Next-${VERSION}-win64"
+          (
+            cd package
+            cmake -E tar cf "../TPC2-Next-${VERSION}-win64.zip" \
+              --format=zip "TPC2-Next-${VERSION}-win64"
+          )
+
+      - name: Smoke test package
+        shell: msys2 {0}
+        run: |
+          archive="$PWD/TPC2-Next-${VERSION}-win64.zip"
+          rm -rf "$RUNNER_TEMP/tpc2-win-smoke"
+          mkdir -p "$RUNNER_TEMP/tpc2-win-smoke"
+          (
+            cd "$RUNNER_TEMP/tpc2-win-smoke"
+            cmake -E tar xf "$archive"
+          )
+          app="$RUNNER_TEMP/tpc2-win-smoke/TPC2-Next-${VERSION}-win64"
+          (
+            cd "$app"
+            PATH="/usr/bin:/bin" ./bin/tpc2cli.exe --backend demo info
+          )
+
+      - name: Attest package provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: TPC2-Next-${{ env.VERSION }}-win64.zip
+
+      - name: Upload release asset
+        shell: bash
+        run: |
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            "TPC2-Next-${VERSION}-win64.zip" --clobber
+
+  macos:
+    name: macOS universal package
+    needs: validate
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - name: Install build dependencies
+        run: brew install cmake ninja
+
+      - name: Install Qt 6.8
+        run: |
+          python3 -m venv "$RUNNER_TEMP/aqt"
+          "$RUNNER_TEMP/aqt/bin/pip" install --upgrade pip aqtinstall
+          "$RUNNER_TEMP/aqt/bin/aqt" install-qt \
+            mac desktop 6.8.3 clang_64 \
+            -m qtserialport -O "$RUNNER_TEMP/Qt"
+          echo "$RUNNER_TEMP/Qt/6.8.3/macos/bin" >> "$GITHUB_PATH"
 
       - name: Configure
         run: |
           cmake -S . -B build/release -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
-            -DCMAKE_INSTALL_PREFIX="$PWD/stage"
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/Qt/6.8.3/macos" \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
 
       - name: Build and test
         run: |
@@ -133,24 +318,90 @@ jobs:
 
       - name: Inspect bundle
         run: |
-          find stage -maxdepth 5 -type f | sort | sed -n '1,160p'
-          otool -L "stage/tpc2.app/Contents/MacOS/tpc2"
-          otool -L "stage/tpc2.app/Contents/MacOS/tpc2cli"
-          if otool -L "stage/tpc2.app/Contents/MacOS/tpc2cli" | grep -q '/opt/homebrew'; then
-            echo "CLI still links against Homebrew Qt" >&2
+          find stage -maxdepth 5 -type f | sort | sed -n '1,200p'
+          for binary in \
+            "stage/tpc2.app/Contents/MacOS/tpc2" \
+            "stage/tpc2.app/Contents/MacOS/tpc2cli" \
+            "stage/tpc2.app/Contents/Frameworks/QtCore.framework/Versions/A/QtCore"; do
+            archs="$(lipo -archs "$binary")"
+            echo "$binary: $archs"
+            case "$archs" in
+              *arm64*) ;;
+              *) echo "Missing arm64 slice in $binary" >&2; exit 1 ;;
+            esac
+            case "$archs" in
+              *x86_64*) ;;
+              *) echo "Missing x86_64 slice in $binary" >&2; exit 1 ;;
+            esac
+          done
+          if otool -L "stage/tpc2.app/Contents/MacOS/tpc2cli" \
+              | grep -q "$RUNNER_TEMP"; then
+            echo "CLI still links against the build-tree Qt installation" >&2
             exit 1
           fi
 
       - name: Trim optional plugins
         run: |
           app="stage/tpc2.app"
-          # Optional plugins whose Qt modules are not part of Homebrew's
-          # default Qt install would otherwise fail to load at runtime.
+          # Optional plugins that are not used by TPC2 Next. Removing them
+          # keeps the bundle smaller and avoids loading unused modules.
           rm -f "$app/Contents/PlugIns/imageformats/libqpdf.dylib"
           rm -f "$app/Contents/PlugIns/imageformats/libqsvg.dylib"
           rm -f "$app/Contents/PlugIns/iconengines/libqsvgicon.dylib"
           rm -f "$app/Contents/PlugIns/platforminputcontexts/libqtvirtualkeyboardplugin.dylib"
-          codesign --force --deep --sign - "$app"
+
+      - name: Set up code signing
+        id: signing
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "No Developer ID certificate configured; using ad-hoc signing."
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          keychain="$RUNNER_TEMP/tpc2-signing.keychain-db"
+          password="$(uuidgen)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -s "$keychain"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 -D \
+            > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          rm -f "$RUNNER_TEMP/certificate.p12"
+
+          identity="$MACOS_SIGN_IDENTITY"
+          if [ -z "$identity" ]; then
+            identity="$(security find-identity -v -p codesigning "$keychain" \
+              | sed -n 's/.*"\(.*\)"/\1/p' | head -1)"
+          fi
+          if [ -z "$identity" ]; then
+            echo "No code-signing identity found in the imported certificate" >&2
+            exit 1
+          fi
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Sign application bundle
+        env:
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
+        run: |
+          app="stage/tpc2.app"
+          if [ "$SIGN_IDENTITY" = "-" ]; then
+            codesign --force --deep --sign - "$app"
+          else
+            codesign --force --deep --options runtime --timestamp \
+              --sign "$SIGN_IDENTITY" "$app"
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app"
 
       - name: Smoke test bundle
         run: |
@@ -168,25 +419,101 @@ jobs:
           wait "$pid" || true
 
       - name: Create disk image
+        env:
+          SIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
         run: |
+          dmg="TPC2-Next-${VERSION}-macos-universal.dmg"
           mkdir -p dmg
           cp -a "stage/tpc2.app" dmg/
           ln -s /Applications dmg/Applications
           hdiutil create -volname "TPC2 Next" -srcfolder dmg \
-            -ov -format UDZO "TPC2-Next-2.1.0-macos-arm64.dmg"
+            -ov -format UDZO "$dmg"
+          if [ "$SIGN_IDENTITY" != "-" ]; then
+            codesign --force --timestamp --sign "$SIGN_IDENTITY" "$dmg"
+          fi
+
+      - name: Notarize disk image
+        if: steps.signing.outputs.identity != '-'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          DMG: TPC2-Next-${{ env.VERSION }}-macos-universal.dmg
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] \
+              || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "Notarization credentials are not configured; leaving the DMG signed but not notarized."
+            exit 0
+          fi
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+
+      - name: Attest package provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: TPC2-Next-${{ env.VERSION }}-macos-universal.dmg
 
       - name: Upload release asset
         run: |
           gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
-            "TPC2-Next-2.1.0-macos-arm64.dmg" --clobber
+            "TPC2-Next-${VERSION}-macos-universal.dmg" --clobber
+
+  firmware:
+    name: Pico bridge firmware
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            python3
+
+      - name: Fetch Pico SDK
+        run: |
+          git clone --depth 1 --branch 2.1.1 --recurse-submodules \
+            https://github.com/raspberrypi/pico-sdk.git \
+            "$RUNNER_TEMP/pico-sdk"
+
+      - name: Build firmware
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S firmware/pico -B build/firmware -G Ninja \
+            -DPICO_BOARD=pico -DPICO_NO_PICOTOOL=1
+          cmake --build build/firmware --parallel
+          test -f build/firmware/tpc2_bridge.uf2
+          cp build/firmware/tpc2_bridge.uf2 tpc2_bridge.uf2
+
+      - name: Attest firmware provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: tpc2_bridge.uf2
+
+      - name: Upload release asset
+        run: |
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            tpc2_bridge.uf2 --clobber
 
   checksums:
     name: Refresh SHA256SUMS
-    needs: [linux, macos]
+    needs: [linux, windows, macos, firmware]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      RELEASE_TAG: ${{ github.event.inputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Download release assets
@@ -199,8 +526,22 @@ jobs:
       - name: Regenerate checksums
         run: |
           cd assets
-          sha256sum * > SHA256SUMS.txt
+          sha256sum -- * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           sha256sum -c SHA256SUMS.txt
           gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
             SHA256SUMS.txt --clobber
+
+  publish:
+    name: Publish release
+    needs: checksums
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Publish draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --draft=false
+          gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,assets

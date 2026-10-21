@@ -4,6 +4,7 @@ endif()
 
 set(_app "${CMAKE_INSTALL_PREFIX}/tpc2.app")
 set(_cli "${_app}/Contents/MacOS/tpc2cli")
+set(_frameworks "${_app}/Contents/Frameworks")
 
 if(NOT EXISTS "${_cli}")
     message(FATAL_ERROR "Expected CLI executable not found: ${_cli}")
@@ -22,12 +23,22 @@ endif()
 
 string(REPLACE "\n" ";" _otool_lines "${_otool_output}")
 foreach(_line IN LISTS _otool_lines)
-    if(NOT _line MATCHES "/opt/homebrew/.*\\.framework")
+    if(NOT _line MATCHES "\\.framework/")
+        continue()
+    endif()
+    # Never rewrite the operating system's own frameworks. Everything else
+    # that points at a framework bundled by macdeployqt can use the relative
+    # path next to the CLI.
+    if(_line MATCHES "/System/Library/Frameworks/"
+       OR _line MATCHES "/Library/Frameworks/")
         continue()
     endif()
     string(REGEX REPLACE "^[ \t]*([^ ]+).*$" "\\1" _old "${_line}")
     string(REGEX REPLACE "^.*/([^/]+)\\.framework/.*$" "\\1"
         _framework "${_old}")
+    if(NOT EXISTS "${_frameworks}/${_framework}.framework")
+        continue()
+    endif()
     set(_new
         "@executable_path/../Frameworks/${_framework}.framework/Versions/A/${_framework}")
     execute_process(
@@ -40,8 +51,18 @@ foreach(_line IN LISTS _otool_lines)
 endforeach()
 
 find_program(_codesign NAMES codesign REQUIRED)
+set(_identity "$ENV{TPC2_CODESIGN_IDENTITY}")
+if(NOT _identity)
+    set(_identity "-")
+endif()
+if(_identity STREQUAL "-")
+    set(_codesign_options --force --deep --sign -)
+else()
+    set(_codesign_options
+        --force --deep --options runtime --timestamp --sign "${_identity}")
+endif()
 execute_process(
-    COMMAND "${_codesign}" --force --deep --sign - "${_app}"
+    COMMAND "${_codesign}" ${_codesign_options} "${_app}"
     RESULT_VARIABLE _codesign_result)
 if(NOT _codesign_result EQUAL 0)
     message(FATAL_ERROR "codesign failed for ${_app}")

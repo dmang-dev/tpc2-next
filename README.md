@@ -1,5 +1,7 @@
 # TPC2 Next
 
+<img src="packaging/icons/tpc2-next-128.png" alt="TPC2 Next icon" width="96" align="right">
+
 [![CI](https://github.com/dmang-dev/tpc2-next/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dmang-dev/tpc2-next/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/dmang-dev/tpc2-next?display_name=tag)](https://github.com/dmang-dev/tpc2-next/releases)
@@ -12,10 +14,13 @@ tool. It talks to a real V64 through a Raspberry Pi Pico USB bridge or a legacy
 parallel port, and it includes a built-in V64 simulator so every feature can be
 tried without hardware.
 
-Prebuilt Windows x64, Linux x86_64, and macOS arm64 packages are attached to the
-[latest release](https://github.com/dmang-dev/tpc2-next/releases/latest). The
-Linux and macOS packages include the Qt runtime; the Pico bridge firmware is
-published there too. Source-build instructions are below.
+Prebuilt Windows x64, Linux x86_64, and macOS universal packages are attached to
+the [latest release](https://github.com/dmang-dev/tpc2-next/releases/latest).
+The packages include the Qt runtime; the Pico bridge firmware is published
+there too. See [`docs/INSTALL.md`](docs/INSTALL.md) for download,
+checksum, desktop-integration and Gatekeeper instructions. Releases include
+`SHA256SUMS.txt` and GitHub build provenance attestations; source-build
+instructions are below.
 
 ![TPC2 Next transfer page](docs/screenshots/transfer.png)
 
@@ -271,7 +276,7 @@ The protocol and electrical details are documented in
 
 ## Packaging
 
-CPack definitions are included. After a Release build:
+CPack definitions are included for local packages. After a Release build:
 
 ```sh
 cd build/windows
@@ -295,6 +300,13 @@ not require MSYS2 on the target machine. The GUI and CLI share the deployed Qt
 libraries. Test a package by extracting it and running `bin\tpc2cli.exe
 --backend demo info` with a restricted `PATH`.
 
+The release workflow builds the Windows ZIP, the Linux tarball (Ubuntu 22.04,
+Qt 6.8.3), the universal macOS DMG and the Pico firmware from the release tag.
+The Linux archive also contains a `.desktop` entry and hicolor icons; see
+[`docs/INSTALL.md`](docs/INSTALL.md). The release process and optional macOS
+signing/notarization secrets are documented in
+[`docs/RELEASING.md`](docs/RELEASING.md).
+
 ## Project layout
 
 ```
@@ -306,13 +318,17 @@ src/gui/        Qt 6 Widgets application
 src/cli/        tpc2cli
 tests/          Simulator-backed unit and integration tests
 firmware/pico/  RP2040 USB bridge firmware
-docs/           Protocol, hardware and migration documentation
-.github/        CI workflow and issue/PR templates
-scripts/        Repository formatting checks
+docs/           Protocol, hardware, migration, install and release documentation
+packaging/      Icons, desktop entry and Windows resource files
+.github/        CI, release and CodeQL workflows, plus issue/PR templates
+scripts/        Formatting checks and icon generation
 ```
 
 ## Compatibility notes
 
+- Prebuilt packages: Windows 10/11 x64; Linux x86_64 with glibc 2.35 or newer
+  (Ubuntu 22.04/Debian 12 or newer); macOS 12 or newer on Apple Silicon or
+  Intel.
 - The V64 protocol is 8.3-only. Long names are truncated deterministically and
   shown before transfer.
 - TPC2's original 32 KB DOS buffer is gone; transfers stream in chunks.
@@ -357,8 +373,10 @@ Set `PICO_SDK_PATH` to the cloned `pico-sdk` directory and reconfigure.
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for build commands, style checks, and
-pull-request expectations. Please report security issues using the private
-process in [`SECURITY.md`](SECURITY.md).
+pull-request expectations. Release history is in
+[`CHANGELOG.md`](CHANGELOG.md); the release process is in
+[`docs/RELEASING.md`](docs/RELEASING.md). Please report security issues using
+the private process in [`SECURITY.md`](SECURITY.md).
 
 ## Credits and licence
 

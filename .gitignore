@@ -8,7 +8,10 @@ dist/
 *.elf
 *.exe
 *.dll
+*.dmg
+*.icns
 *.user
 CMakeUserPresets.json
 .DS_Store
 Thumbs.db
+aqtinstall.log

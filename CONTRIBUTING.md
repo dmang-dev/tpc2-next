@@ -34,6 +34,11 @@ python scripts/check-format.py
 ```
 
 The GitHub Actions matrix builds and tests Windows/MSYS2, Ubuntu, and macOS.
+CodeQL runs on pushes, pull requests and a weekly schedule.
+
+Application icons are generated from `packaging/icons/tpc2-next.svg` with
+`python scripts/generate-icons.py` (requires Pillow). Commit the generated PNG,
+ICO and iconset files with the source artwork.
 
 ## Pull requests
 
@@ -57,3 +62,8 @@ Use the bug report template and include:
 
 For security issues, follow [`SECURITY.md`](SECURITY.md) instead of opening a
 public issue.
+
+## Releasing
+
+See [`docs/RELEASING.md`](docs/RELEASING.md) for the tag, version and optional
+macOS signing/notarization process.

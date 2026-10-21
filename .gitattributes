@@ -8,10 +8,19 @@
 *.cmake text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.svg text eol=lf
+*.desktop text eol=lf
+*.rc text eol=lf
+*.in text eol=lf
 .editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
 CMakeLists.txt text eol=lf
 *.zip binary
 *.png binary
+*.ico binary
+*.icns binary
+*.dmg binary
 *.uf2 binary
 *.bin binary
 *.elf binary

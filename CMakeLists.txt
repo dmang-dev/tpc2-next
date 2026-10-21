@@ -4,7 +4,11 @@ if(POLICY CMP0207)
     cmake_policy(SET CMP0207 NEW)
 endif()
 
-project(TPC2Next VERSION 2.1.0 LANGUAGES CXX)
+project(TPC2Next VERSION 2.2.0 LANGUAGES CXX)
+
+if(WIN32)
+    enable_language(RC)
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -129,6 +133,43 @@ if(TPC2_BUILD_GUI AND Qt6Widgets_FOUND)
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         )
+
+        # iconutil is part of the macOS developer tools. Generate the .icns
+        # from the committed iconset so the repository does not need to carry
+        # a generated binary.
+        find_program(ICONUTIL_EXECUTABLE iconutil)
+        file(GLOB _tpc2_iconset_files
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/tpc2-next.iconset/*.png")
+        if(ICONUTIL_EXECUTABLE AND _tpc2_iconset_files)
+            set(_tpc2_icns "${CMAKE_CURRENT_BINARY_DIR}/tpc2-next.icns")
+            execute_process(
+                COMMAND "${ICONUTIL_EXECUTABLE}" -c icns
+                    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/tpc2-next.iconset"
+                    -o "${_tpc2_icns}"
+                RESULT_VARIABLE _tpc2_icon_result)
+            if(NOT _tpc2_icon_result EQUAL 0)
+                message(FATAL_ERROR "iconutil failed to create ${_tpc2_icns}")
+            endif()
+            set_source_files_properties("${_tpc2_icns}" PROPERTIES
+                MACOSX_PACKAGE_LOCATION "Resources")
+            target_sources(tpc2 PRIVATE "${_tpc2_icns}")
+            set_target_properties(tpc2 PROPERTIES
+                MACOSX_BUNDLE_ICON_FILE "tpc2-next.icns")
+        else()
+            message(WARNING
+                "iconutil or packaging/icons/tpc2-next.iconset is missing; "
+                "the macOS app will use the default icon")
+        endif()
+    endif()
+
+    if(WIN32)
+        set(TPC2_WINDOWS_ICON
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icons/tpc2-next.ico")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/tpc2.rc.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/tpc2.rc"
+            @ONLY)
+        target_sources(tpc2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/tpc2.rc")
     endif()
 endif()
 
@@ -297,10 +338,24 @@ if(WIN32 AND MINGW)
 endif()
 
 install(FILES README.md LICENSE NOTICE CONTRIBUTING.md SECURITY.md
-    DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(DIRECTORY docs/ DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
 install(FILES firmware/pico/README.md
     DESTINATION ${CMAKE_INSTALL_DOCDIR}/firmware/pico)
+
+# Linux desktop integration. The portable tarball contains these files under
+# share/, so a system install (or a package built from it) can register the
+# application with the desktop environment.
+if(UNIX AND NOT APPLE AND TARGET tpc2)
+    install(FILES packaging/linux/tpc2-next.desktop
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/icons/tpc2-next-256.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+        RENAME tpc2-next.png)
+    install(FILES packaging/icons/tpc2-next-512.png
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
+        RENAME tpc2-next.png)
+endif()
 
 set(CPACK_PACKAGE_NAME "TPC2 Next")
 set(CPACK_PACKAGE_VENDOR "TPC2 Next contributors")

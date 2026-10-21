@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=TPC2 Next
+GenericName=Doctor V64 Utility
+Comment=Upload, download and remote-control a Doctor V64
+Exec=tpc2
+Icon=tpc2-next
+Terminal=false
+Categories=Utility;Emulator;
+Keywords=Doctor V64;N64;TPC2;V64;GD6;
+StartupNotify=true
+StartupWMClass=tpc2
