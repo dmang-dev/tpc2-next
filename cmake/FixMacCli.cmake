@@ -3,6 +3,7 @@ if(NOT APPLE)
 endif()
 
 set(_app "${CMAKE_INSTALL_PREFIX}/tpc2.app")
+set(_gui "${_app}/Contents/MacOS/tpc2")
 set(_cli "${_app}/Contents/MacOS/tpc2cli")
 set(_frameworks "${_app}/Contents/Frameworks")
 
@@ -49,6 +50,29 @@ foreach(_line IN LISTS _otool_lines)
             "install_name_tool failed to rewrite ${_old}")
     endif()
 endforeach()
+
+# macdeployqt normally adds this rpath to the GUI executable, but Qt's
+# official macOS packages have produced bundles without it. Add it explicitly
+# when it is missing so the GUI can find Contents/Frameworks.
+if(EXISTS "${_gui}")
+    execute_process(
+        COMMAND "${_otool}" -l "${_gui}"
+        OUTPUT_VARIABLE _gui_load_commands
+        RESULT_VARIABLE _gui_otool_result)
+    if(NOT _gui_otool_result EQUAL 0)
+        message(FATAL_ERROR "otool failed for ${_gui}")
+    endif()
+    if(NOT _gui_load_commands MATCHES "@executable_path/\\.\\./Frameworks")
+        execute_process(
+            COMMAND "${_install_name_tool}" -add_rpath
+                "@executable_path/../Frameworks" "${_gui}"
+            RESULT_VARIABLE _gui_rpath_result)
+        if(NOT _gui_rpath_result EQUAL 0)
+            message(FATAL_ERROR
+                "install_name_tool failed to add the GUI framework rpath")
+        endif()
+    endif()
+endif()
 
 find_program(_codesign NAMES codesign REQUIRED)
 set(_identity "$ENV{TPC2_CODESIGN_IDENTITY}")

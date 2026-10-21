@@ -215,6 +215,7 @@ jobs:
           cmake -S . -B build/release -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH=C:/msys64/ucrt64
+          -DTPC2_DEPLOY_BUILD_RUNTIME=OFF
           -DCMAKE_INSTALL_PREFIX="$(cygpath -m "$PWD/stage")"
 
       - name: Build and test

@@ -17,6 +17,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(TPC2_BUILD_GUI "Build the Qt desktop application" ON)
 option(TPC2_BUILD_CLI "Build the command line tool" ON)
 option(TPC2_BUILD_TESTS "Build the unit tests" ON)
+option(TPC2_DEPLOY_BUILD_RUNTIME
+    "Copy Windows runtime DLLs next to build-tree executables" ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC OFF)
@@ -176,6 +178,10 @@ endif()
 # The portable Linux package puts Qt libraries in ../lib and the macOS CLI
 # lives inside the app bundle, next to the bundled frameworks.
 if(APPLE)
+    if(TARGET tpc2)
+        set_target_properties(tpc2 PROPERTIES
+            INSTALL_RPATH "@executable_path/../Frameworks")
+    endif()
     if(TARGET tpc2cli)
         set_target_properties(tpc2cli PROPERTIES
             INSTALL_RPATH "@executable_path/../Frameworks")
@@ -202,7 +208,7 @@ endif()
 # MSYS2 bin directory; Windows only searches PATH by default, which is not set
 # for Explorer launches. Deploy once, after all executables have linked, so
 # parallel build steps cannot race on the same DLLs.
-if(WIN32 AND MINGW)
+if(WIN32 AND MINGW AND TPC2_DEPLOY_BUILD_RUNTIME)
     set(_tpc2_runtime_targets)
     foreach(_target tpc2 tpc2cli tpc2_tests)
         if(TARGET ${_target})
