@@ -54,6 +54,7 @@ private:
     std::unique_ptr<ParallelPort> port_;
     uint16_t base_ = 0;
     ComMode mode_ = ComMode::Old;
+    bool modeKnown_ = false; // a sync has succeeded since open()
     std::optional<ComMode> preferred_;
     std::chrono::milliseconds handshakeTimeout_ { 4000 };
     std::chrono::milliseconds byteTimeout_ { 1500 };

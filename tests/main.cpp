@@ -441,6 +441,37 @@ void testV64Sync(Backend backend)
     }
 }
 
+void testV64SyncRemembersMode(Backend backend)
+{
+    // Auto mode starts with the old handshake, but once the new one has
+    // worked, later syncs try it first. Otherwise every operation against a
+    // new-only V64 waits out the old-mode timeout. The DOS tools keep the
+    // working mode too [T].
+    Rig rig(backend, V64_HS_NEW);
+    Session session(*rig.link);
+    CHECK_EQ(session.connect().mode, ComMode::New);
+    const uint64_t first = rig.sim.nowUs();
+    CHECK(first >= 50'000); // the failed old attempt timed out once
+
+    rig.sim.setTracing(true);
+    for (int i = 0; i < 3; ++i)
+        CHECK_EQ(session.connect().mode, ComMode::New);
+    CHECK(rig.sim.nowUs() - first < 100'000);
+    CHECK(findLine(rig.sim.traceLines(), 0, { "D=AA" }) < 0);
+    CHECK_EQ(rig.sim.eventsOf(V64_EV_SYNC).size(), std::size_t(4));
+
+    // A unit swapped for an old-only one: the remembered mode fails and the
+    // link falls back to the other handshake.
+    rig.sim.config().modes = V64_HS_OLD;
+    rig.sim.reset();
+    CHECK_EQ(session.connect().mode, ComMode::Old);
+    CHECK_EQ(rig.link->mode(), ComMode::Old);
+    // And old is now tried first again.
+    const uint64_t before = rig.sim.nowUs();
+    CHECK_EQ(session.connect().mode, ComMode::Old);
+    CHECK(rig.sim.nowUs() - before < 100'000);
+}
+
 void testV64SyncTrace(Backend backend)
 {
     // The pulses on the wire, as seen by the V64 [PROTOCOL.md 1].
@@ -879,6 +910,7 @@ int main()
     for (Backend backend : { Backend::Parallel, Backend::Bridge }) {
         const std::string prefix = std::string("v64/") + backendName(backend) + "/";
         runTest(prefix + "sync", [&] { testV64Sync(backend); });
+        runTest(prefix + "syncRemembersMode", [&] { testV64SyncRemembersMode(backend); });
         runTest(prefix + "syncTrace", [&] { testV64SyncTrace(backend); });
         for (ComMode mode : { ComMode::Old, ComMode::New }) {
             const std::string m = std::string("/") + modeName(mode);

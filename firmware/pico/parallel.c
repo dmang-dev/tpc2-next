@@ -28,6 +28,10 @@
 #define BYTE_TIMEOUT_US (1500ull * 1000ull)
 
 static int mode_ = V64_MODE_OLD;
+// Set once a sync succeeds. In auto mode the next sync tries mode_ first, so
+// a V64 that only answers the new handshake does not wait out the old-mode
+// timeout on every command. The DOS tools keep the working mode the same way.
+static bool mode_known_ = false;
 static uint8_t control_shadow_ = CTRL_INIT;
 
 static inline uint32_t data_mask(void)
@@ -105,6 +109,9 @@ uint8_t parallel_read_control(void)
 
 void parallel_init(void)
 {
+    mode_ = V64_MODE_OLD;
+    mode_known_ = false;
+
     for (unsigned bit = 0; bit < 8; ++bit) {
         const unsigned pin = TPC2_PIN_DATA_BASE + bit;
         gpio_init(pin);
@@ -240,19 +247,19 @@ int parallel_sync(int preferred)
 
     const bool try_old = preferred == 0 || preferred == 1;
     const bool try_new = preferred == 0 || preferred == 2;
+    const bool new_first = preferred == 0 && mode_known_ && mode_ == V64_MODE_NEW;
 
-    if (try_old && sync_old()) {
-        mode_ = V64_MODE_OLD;
-        return mode_;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        const bool use_new = (attempt == 0) == new_first;
+        if (use_new ? !try_new : !try_old)
+            continue;
+        if (use_new ? sync_new() : sync_old()) {
+            mode_ = use_new ? V64_MODE_NEW : V64_MODE_OLD;
+            mode_known_ = true;
+            return mode_;
+        }
+        parallel_reset();
     }
-
-    parallel_reset();
-    if (try_new && sync_new()) {
-        mode_ = V64_MODE_NEW;
-        return mode_;
-    }
-
-    parallel_reset();
     return -1;
 }
 

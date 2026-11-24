@@ -253,8 +253,8 @@ like a real LPT port, so chunk boundaries are invisible to the V64.
 |-------|--------------|-----------|
 | Buffer | fixed 32 KB | streaming, no transfer-size limit below 4 GiB |
 | Ports | ISA LPT1–LPT4 from the BIOS data area | explicit LPT base or Pico bridge |
-| Handshake | starts in old mode; each failed sync flips the mode and retries until ESC; the last working mode is kept | old first, then new, on every sync; fails after both time out |
-| Sync timeout | 8192 status polls per attempt (milliseconds) | 4 s per attempt, so 4 s per operation against a V64 that answers only the new handshake |
+| Handshake | starts in old mode; each failed sync flips the mode and retries until ESC; the last working mode is kept | starts in old mode; each sync tries the last working mode first, then the other; fails after both time out |
+| Sync timeout | 8192 status polls per attempt (milliseconds) | 4 s per attempt (5 s on the Pico bridge), so the first operation against a new-only V64 takes about 4 s longer |
 | Byte timeout | 20 × 65536 polls (about 1.3 s on a fast ISA bus) | 1.5 s |
 | Data lines before sync | left at the last byte sent | driven to 0 |
 | Filenames | DOS 8.3 from the command line | 8.3 conversion with a preview |

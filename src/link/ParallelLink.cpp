@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <functional>
 #include <thread>
+#include <utility>
 
 namespace tpc2 {
 namespace {
@@ -41,6 +42,7 @@ void ParallelLink::open()
 
 void ParallelLink::close()
 {
+    modeKnown_ = false;
     if (port_)
         port_->close();
 }
@@ -162,19 +164,24 @@ ComMode ParallelLink::sync()
     port_->writeControl(kInit);
     port_->writeData(0);
 
-    const bool tryOld = !preferred_ || *preferred_ == ComMode::Old;
-    const bool tryNew = !preferred_ || *preferred_ == ComMode::New;
+    // Auto mode tries the handshake that worked last time first, then the
+    // other one. Trying old first on every sync would make each operation
+    // against a new-only V64 wait out the whole old-mode timeout; the DOS
+    // tools also keep the working mode.
+    ComMode order[2] = { ComMode::Old, ComMode::New };
+    if (!preferred_ && modeKnown_ && mode_ == ComMode::New)
+        std::swap(order[0], order[1]);
 
-    if (tryOld && syncOld()) {
-        mode_ = ComMode::Old;
-        return mode_;
+    for (const ComMode candidate : order) {
+        if (preferred_ && *preferred_ != candidate)
+            continue;
+        if (candidate == ComMode::Old ? syncOld() : syncNew()) {
+            mode_ = candidate;
+            modeKnown_ = true;
+            return mode_;
+        }
+        reset();
     }
-    reset();
-    if (tryNew && syncNew()) {
-        mode_ = ComMode::New;
-        return mode_;
-    }
-    reset();
     throw Error(ErrorCode::Timeout,
                 "No answer from the V64. Check the cable, the V64 power, and "
                 "whether the unit is waiting for a PC transfer.");

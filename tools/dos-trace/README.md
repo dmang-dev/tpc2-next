@@ -71,6 +71,8 @@ where the DOS tools leave the last byte on the bus. The differences are:
 - the download request name field;
 - how received file names are mapped to local names;
 - the zero-file download result;
-- ParallelLink's fixed old-then-new sync order. Against a V64 that answers only
-  the new handshake, this costs the full 4 s old-mode timeout on every
-  operation. The original spends 8192 polls once, then remembers the mode.
+- the first sync against a V64 that answers only the new handshake. Both start
+  in old mode, but the original gives up after 8192 polls; ParallelLink waits
+  out its 4 s timeout. Later operations reuse the working mode on both sides.
+  Before this harness, ParallelLink and the Pico firmware went back to old
+  mode on every sync. That cost 4–5 s per operation, and it is now fixed.

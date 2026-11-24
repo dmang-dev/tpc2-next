@@ -191,7 +191,7 @@ is the only backend available on macOS.
 
 ## 6. Validation and known limitations
 
-The automated suite (`tpc2_tests`, 532 checks) covers handshake parsing, CRC and
+The automated suite (`tpc2_tests`, 556 checks) covers handshake parsing, CRC and
 SLIP framing, name conversion, upload and download, extended commands,
 cancellation and BIOS filenames. It also runs against the demo device.
 
@@ -230,6 +230,10 @@ These tests found and fixed five bridge bugs:
 - The firmware inverted ACK and ERROR. This made every nibble read wrong and
   new-mode sync impossible.
 
+The trace comparison found one more problem, now fixed in both `ParallelLink`
+and the firmware. Every sync tried the old handshake first, so each operation
+against a new-only V64 waited out the old-mode timeout.
+
 ### Comparison with the DOS tools
 
 `tools/dos-trace` runs the original `TPC2.EXE` and `V64IO2.EXE` on an 8086
@@ -251,10 +255,9 @@ The remaining differences are listed in PROTOCOL.md §7:
   files.
 - **Data lines before sync:** the original leaves the last byte on the bus;
   Next drives 0.
-- **Sync order:** Next always tries the old handshake first. Against a V64 that
-  answers only the new handshake, each operation waits out the 4 s old-mode
-  timeout. The original fails over in about 8192 polls, once, and then keeps
-  the working mode.
+- **First sync against a new-only V64:** both start with the old handshake.
+  The original gives up on it after 8192 polls, so within milliseconds. Next
+  waits out its 4 s timeout. After that, both keep the mode that worked.
 
 ### Assumptions in the model
 
