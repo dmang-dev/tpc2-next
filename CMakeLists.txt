@@ -278,6 +278,19 @@ if(TPC2_BUILD_TESTS)
     target_compile_options(tpc2_tests PRIVATE ${TPC2_WARNINGS})
     add_test(NAME tpc2-tests COMMAND tpc2_tests)
 
+    # Runs the original DOS tools on an 8086 interpreter wired to the same V64
+    # model and diffs their pin traces against ParallelLink. Needs the DOS
+    # binaries, which are not in the repository, so it is not a ctest.
+    add_executable(tpc2_dos_trace
+        tools/dos-trace/Cpu8086.h
+        tools/dos-trace/Cpu8086.cpp
+        tools/dos-trace/DosMachine.h
+        tools/dos-trace/DosMachine.cpp
+        tools/dos-trace/main.cpp)
+    target_link_libraries(tpc2_dos_trace PRIVATE tpc2core tpc2_v64sim)
+    target_compile_options(tpc2_dos_trace PRIVATE ${TPC2_WARNINGS})
+    set_target_properties(tpc2_dos_trace PROPERTIES AUTOMOC OFF)
+
     if(TPC2_BUILD_CLI)
         find_package(Python3 COMPONENTS Interpreter QUIET)
         if(Python3_Interpreter_FOUND)
