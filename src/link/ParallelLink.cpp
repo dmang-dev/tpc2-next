@@ -28,6 +28,7 @@ ParallelLink::ParallelLink(std::unique_ptr<ParallelPort> port,
                            uint16_t baseAddress)
     : port_(std::move(port)), base_(baseAddress)
 {
+    setClock({});
 }
 
 void ParallelLink::open()
@@ -69,17 +70,23 @@ void ParallelLink::setTimeouts(std::chrono::milliseconds handshake,
     byteTimeout_ = byte;
 }
 
+void ParallelLink::setClock(Clock now, std::function<void()> relax)
+{
+    now_ = now ? std::move(now) : Clock([] { return std::chrono::steady_clock::now(); });
+    relax_ = relax ? std::move(relax) : std::function<void()>([] { std::this_thread::yield(); });
+}
+
 bool ParallelLink::waitUntil(const char* what,
                              const std::function<bool()>& predicate,
                              std::chrono::milliseconds timeout)
 {
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    const auto deadline = now_() + timeout;
     unsigned spins = 0;
-    while (std::chrono::steady_clock::now() < deadline) {
+    while (now_() < deadline) {
         if (predicate())
             return true;
         if ((++spins & 0x3F) == 0)
-            std::this_thread::yield();
+            relax_();
     }
     (void)what;
     return false;
@@ -251,9 +258,9 @@ void ParallelLink::checkSync()
     if (!isOpen())
         throw Error(ErrorCode::NotConnected, "Parallel port is not open");
 
-    const auto deadline = std::chrono::steady_clock::now() + handshakeTimeout_;
+    const auto deadline = now_() + handshakeTimeout_;
     unsigned spins = 0;
-    while (std::chrono::steady_clock::now() < deadline) {
+    while (now_() < deadline) {
         const uint8_t control = port_->readControl();
         const uint8_t status = port_->readStatus();
         bool ready = false;
@@ -272,7 +279,7 @@ void ParallelLink::checkSync()
             break;
         }
         if ((++spins & 0x3F) == 0)
-            std::this_thread::yield();
+            relax_();
     }
     throw Error(ErrorCode::Timeout, "V64 did not acknowledge the command header");
 }

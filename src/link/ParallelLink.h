@@ -36,6 +36,13 @@ public:
     void setTimeouts(std::chrono::milliseconds handshake,
                      std::chrono::milliseconds byte);
 
+    // Test hook. Replaces the clock used for every timeout and the callback
+    // run every few polls while waiting. Tests drive both from a simulated
+    // port so timeouts are deterministic; hardware builds keep the defaults
+    // (steady_clock and std::this_thread::yield).
+    using Clock = std::function<std::chrono::steady_clock::time_point()>;
+    void setClock(Clock now, std::function<void()> relax = {});
+
 private:
     bool syncOld();
     bool syncNew();
@@ -50,6 +57,8 @@ private:
     std::optional<ComMode> preferred_;
     std::chrono::milliseconds handshakeTimeout_ { 4000 };
     std::chrono::milliseconds byteTimeout_ { 1500 };
+    Clock now_;
+    std::function<void()> relax_;
 };
 
 } // namespace tpc2
