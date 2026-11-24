@@ -191,23 +191,103 @@ is the only backend available on macOS.
 
 ## 6. Validation and known limitations
 
-The automated suite (`tpc2_tests`, 56 checks) covers handshake parsing, CRC and
-SLIP framing, name conversion, upload/download, extended commands, cancellation
-and BIOS filenames. The demo device implements the same state machine as the
-real protocol.
+The automated suite (`tpc2_tests`, 532 checks) covers handshake parsing, CRC and
+SLIP framing, name conversion, upload and download, extended commands,
+cancellation and BIOS filenames. It also runs against the demo device.
 
-Not covered by automated tests:
+### Pin-level V64 model
 
-- Electrical timing on a specific V64/BIOS/cable combination.
+`tests/v64` holds a pin-level model of the V64's side of the cable
+(`v64_model.c`). Each rule in it is tagged with its source: PROTOCOL.md, the
+demo device, the original DOS tools, or an assumption. Two hosts drive the same
+model, and the tests run every case through both:
+
+- `ParallelLink` through `FakeV64Port`. This port uses real PC register
+  polarity (only BUSY inverted on status; STROBE, AUTOFD and SELECTIN inverted
+  on control), open-drain AUTOFD/SELECTIN, and reserved bits that read as ones.
+  A virtual microsecond clock keeps every timeout deterministic.
+- `BridgeLink` through `FakePicoTransport`. This runs the real Pico firmware
+  (`firmware/pico/bridge.c` and `parallel.c`) on the host, against GPIO shims
+  wired to the model.
+
+The tests cover the following, for old-only, new-only and dual-handshake units:
+
+- Both sync sequences and mode detection, plus a golden pin trace of each.
+- Uploads of 0 B to 70001 bytes, across the 32 KiB block boundary.
+- Downloads of DRAM-backed and stored files.
+- GD6E DRAM and CPU read and write, call, and OSD, including the region rules.
+- Cancellation, and recovery with a fresh sync.
+- Errors: an unpowered unit, a stalled V64, a rejected command, a pre-1.30 BIOS
+  without GD6E, and a wrong ACK byte.
+- Slow V64 reaction times, and run-to-run determinism.
+
+These tests found and fixed five bridge bugs:
+
+- Firmware replies did not echo the command.
+- `BridgeLink` compared the reply command wrongly.
+- `BridgeLink::setTimeouts` was declared but never defined.
+- The firmware never enabled its STROBE and INIT outputs.
+- The firmware inverted ACK and ERROR. This made every nibble read wrong and
+  new-mode sync impossible.
+
+### Comparison with the DOS tools
+
+`tools/dos-trace` runs the original `TPC2.EXE` and `V64IO2.EXE` on an 8086
+interpreter wired to the same model, then diffs their pin traces against
+`ParallelLink` for the same operations. You supply the binaries; they are not in
+the repository. Over both handshakes, these produce pin-identical traces:
+
+- uploads (40000 bytes);
+- downloads;
+- GD6E write, read, CPU write, call and OSD.
+
+The remaining differences are listed in PROTOCOL.md §7:
+
+- **Download request name:** the original sends the `/name` the user typed;
+  Next sends blanks.
+- **Received file names:** the original removes all spaces; Next trims trailing
+  ones.
+- **Zero-file downloads:** the original reports an error; Next succeeds with no
+  files.
+- **Data lines before sync:** the original leaves the last byte on the bus;
+  Next drives 0.
+- **Sync order:** Next always tries the old handshake first. Against a V64 that
+  answers only the new handshake, each operation waits out the 4 s old-mode
+  timeout. The original fails over in about 8192 polls, once, and then keeps
+  the working mode.
+
+### Assumptions in the model
+
+PROTOCOL.md does not settle these points. Each is marked `[A]` in
+`v64_model.c`:
+
+- The reject byte value (0x00 by default).
+- BUSY behaviour while the V64 receives.
+- How a pre-1.30 BIOS reacts to GD6E (configurable: silent or reject).
+- That a new sync aborts a command in progress.
+- That uploads land at DRAM offset 0.
+- The delay after an ACK.
+
+### Not covered by automated tests
+
+- Electrical timing on a specific V64, BIOS and cable combination. The model is
+  not derived from a V64 BIOS.
 - Windows InpOut driver installation.
 - Linux port permissions.
+- `QtSerialTransport` against a real or virtual COM port.
 - Pico firmware on physical hardware. The firmware compiles cleanly with Pico
-  SDK 2.1.1 and Arm GCC 16.2.0 and produces a valid UF2, but it has not been
-  flashed onto a board or connected to a V64 in this environment.
+  SDK 2.1.1 and Arm GCC 16.2.0, and the host build exercises its protocol
+  logic. It has not been flashed onto a board or connected to a V64 in this
+  environment.
+- The session-level 2 ms pause between downloaded files. It uses real time.
 
-If a real transfer fails, start with the demo backend, then the bridge with a
-short full-pin cable, then force the handshake mode. See the troubleshooting
-sections in `README.md` and `docs/HARDWARE.md`.
+If a real transfer fails, try these in order:
+
+1. The demo backend.
+2. The bridge, with a short full-pin cable.
+3. Forcing the handshake mode.
+
+See the troubleshooting sections in `README.md` and `docs/HARDWARE.md`.
 
 ## 7. Migration checklist for users
 

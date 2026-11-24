@@ -29,7 +29,9 @@ The PC's status and control ports invert some pins. The important consequences
 for software are:
 
 - Status bit 7 is high when the `BUSY` **pin** is low.
-- Status bit 3 is high when the `ERROR` **pin** is low.
+- Status bits 6 (`ACK`), 5 (`PE`), 4 (`SLCT`) and 3 (`ERROR`) follow their pins
+  directly. They are **not** inverted: bit 3 reads low while the V64 pulls `ERROR`
+  low. Only `BUSY` is inverted on the status port.
 - Control bit 0 high drives `STROBE` low.
 - Control bit 1 high drives `AUTOFD` low.
 - Control bit 2 high drives `INIT` high (this one is **not** inverted).
@@ -187,6 +189,11 @@ character:
 - **D6 = 1** — NEC6450 OSD character code.
 
 The modern app exposes both as checkboxes and applies them to every character.
+V64IO2 itself sends the text unchanged and masks the position bytes: it sends
+`row & 0xEF` and `column & 0x1F`, and it checks only `(row & 0x0F) > 0x0A` and
+`(column & 0x1F) > 0x17`. Its help text describes the flash flag as row bit 7,
+so with V64IO2 a row such as `0x82` passes through. TPC2 Next sends the row
+and column as given and rejects a row above 10 or a column above 23.
 The string must be printable ASCII (`0x20`–`0x7E`); `0xFF` is the terminator and
 cannot appear in the text.
 
@@ -206,6 +213,9 @@ Frame body:
 request:  [cmd]      [seq] [status=0] [len_lo] [len_hi] [payload] [crc_lo] [crc_hi]
 response: [cmd|0x80] [seq] [status]   [len_lo] [len_hi] [payload] [crc_lo] [crc_hi]
 ```
+
+A response echoes the request's command with bit 7 set, so the host can match
+each reply to its request.
 
 Commands:
 
@@ -243,8 +253,13 @@ like a real LPT port, so chunk boundaries are invisible to the V64.
 |-------|--------------|-----------|
 | Buffer | fixed 32 KB | streaming, no transfer-size limit below 4 GiB |
 | Ports | ISA LPT1–LPT4 from the BIOS data area | explicit LPT base or Pico bridge |
-| Handshake | manual old/new selection | auto with old-then-new fallback |
+| Handshake | starts in old mode; each failed sync flips the mode and retries until ESC; the last working mode is kept | old first, then new, on every sync; fails after both time out |
+| Sync timeout | 8192 status polls per attempt (milliseconds) | 4 s per attempt, so 4 s per operation against a V64 that answers only the new handshake |
+| Byte timeout | 20 × 65536 polls (about 1.3 s on a fast ISA bus) | 1.5 s |
+| Data lines before sync | left at the last byte sent | driven to 0 |
 | Filenames | DOS 8.3 from the command line | 8.3 conversion with a preview |
 | Download name field | user-supplied `/name` | blank; device headers name the files |
+| Received file names | all spaces removed (`MY GAME.V64` → `MYGAME.V64`) | trailing spaces trimmed, other non-printables → `_` |
+| Download with zero files | prints "no data recive", exits with an error | succeeds with no files |
 | OSD text | DOS codepage bytes | printable ASCII plus V64IO2 flags |
 | Output | text console | GUI + scriptable CLI |
