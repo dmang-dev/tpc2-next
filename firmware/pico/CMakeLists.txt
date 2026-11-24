@@ -23,6 +23,7 @@ pico_sdk_init()
 
 add_executable(tpc2_bridge
     main.c
+    bridge.c
     parallel.c
 )
 
