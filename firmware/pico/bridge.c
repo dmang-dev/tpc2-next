@@ -121,11 +121,13 @@ static void send_frame(uint8_t command, uint8_t sequence, uint8_t status,
     bridge_platform_write(tx_buffer, out);
 }
 
-static void send_status(uint8_t sequence, uint8_t status, const char* message)
+// Every reply echoes the request's command with bit 7 set [PROTOCOL.md 5].
+static void send_status(uint8_t command, uint8_t sequence, uint8_t status,
+                        const char* message)
 {
     if (message == NULL)
         message = "";
-    send_frame(0, sequence, status, (const uint8_t*)message, strlen(message));
+    send_frame(command, sequence, status, (const uint8_t*)message, strlen(message));
 }
 
 static void handle_frame(uint8_t command, uint8_t sequence,
@@ -133,52 +135,52 @@ static void handle_frame(uint8_t command, uint8_t sequence,
 {
     switch (command) {
     case CMD_PING:
-        send_status(sequence, STATUS_OK, BRIDGE_VERSION);
+        send_status(command, sequence, STATUS_OK, BRIDGE_VERSION);
         break;
 
     case CMD_SYNC: {
         if (length < 1) {
-            send_status(sequence, STATUS_BAD_REQUEST, "Sync needs a mode byte");
+            send_status(command, sequence, STATUS_BAD_REQUEST, "Sync needs a mode byte");
             break;
         }
         preferred_mode = data[0];
         const int mode = parallel_sync(preferred_mode);
         if (mode < 0) {
-            send_status(sequence, STATUS_TIMEOUT,
+            send_status(command, sequence, STATUS_TIMEOUT,
                         "No answer from the V64 (check power, cable and the "
                         "front-panel transfer screen)");
             break;
         }
         const uint8_t result = (uint8_t)(mode == V64_MODE_NEW ? 1 : 0);
-        send_frame(0, sequence, STATUS_OK, &result, 1);
+        send_frame(command, sequence, STATUS_OK, &result, 1);
         break;
     }
 
     case CMD_SET_MODE:
         if (length < 1) {
-            send_status(sequence, STATUS_BAD_REQUEST, "SetMode needs a mode byte");
+            send_status(command, sequence, STATUS_BAD_REQUEST, "SetMode needs a mode byte");
             break;
         }
         preferred_mode = data[0];
-        send_status(sequence, STATUS_OK, NULL);
+        send_status(command, sequence, STATUS_OK, NULL);
         break;
 
     case CMD_WRITE:
         if (length > MAX_PAYLOAD) {
-            send_status(sequence, STATUS_BAD_REQUEST, "Write payload is too large");
+            send_status(command, sequence, STATUS_BAD_REQUEST, "Write payload is too large");
             break;
         }
         if (parallel_write(data, length) != V64_PARALLEL_OK) {
-            send_status(sequence, STATUS_TIMEOUT,
+            send_status(command, sequence, STATUS_TIMEOUT,
                         "The V64 stopped accepting data");
             break;
         }
-        send_status(sequence, STATUS_OK, NULL);
+        send_status(command, sequence, STATUS_OK, NULL);
         break;
 
     case CMD_READ: {
         if (length != 4) {
-            send_status(sequence, STATUS_BAD_REQUEST,
+            send_status(command, sequence, STATUS_BAD_REQUEST,
                         "Read needs a 32-bit little-endian length");
             break;
         }
@@ -187,30 +189,30 @@ static void handle_frame(uint8_t command, uint8_t sequence,
             | ((uint32_t)data[2] << 16)
             | ((uint32_t)data[3] << 24);
         if (count == 0 || count > MAX_PAYLOAD) {
-            send_status(sequence, STATUS_BAD_REQUEST, "Invalid read length");
+            send_status(command, sequence, STATUS_BAD_REQUEST, "Invalid read length");
             break;
         }
         if (parallel_read(io_buffer, count) != V64_PARALLEL_OK) {
-            send_status(sequence, STATUS_TIMEOUT,
+            send_status(command, sequence, STATUS_TIMEOUT,
                         "The V64 stopped sending data");
             break;
         }
-        send_frame(0, sequence, STATUS_OK, io_buffer, count);
+        send_frame(command, sequence, STATUS_OK, io_buffer, count);
         break;
     }
 
     case CMD_CHECK_SYNC:
         if (parallel_check_sync() != V64_PARALLEL_OK) {
-            send_status(sequence, STATUS_TIMEOUT,
+            send_status(command, sequence, STATUS_TIMEOUT,
                         "The V64 did not acknowledge the command header");
             break;
         }
-        send_status(sequence, STATUS_OK, NULL);
+        send_status(command, sequence, STATUS_OK, NULL);
         break;
 
     case CMD_RESET:
         parallel_reset();
-        send_status(sequence, STATUS_OK, NULL);
+        send_status(command, sequence, STATUS_OK, NULL);
         break;
 
     case CMD_INFO: {
@@ -224,12 +226,12 @@ static void handle_frame(uint8_t command, uint8_t sequence,
                  TPC2_PIN_SELECTIN,
                  TPC2_PIN_BUSY, TPC2_PIN_ACK, TPC2_PIN_PE,
                  TPC2_PIN_SLCT, TPC2_PIN_ERROR);
-        send_frame(0, sequence, STATUS_OK, (const uint8_t*)info, strlen(info));
+        send_frame(command, sequence, STATUS_OK, (const uint8_t*)info, strlen(info));
         break;
     }
 
     default:
-        send_status(sequence, STATUS_UNSUPPORTED, "Unknown bridge command");
+        send_status(command, sequence, STATUS_UNSUPPORTED, "Unknown bridge command");
         break;
     }
 }

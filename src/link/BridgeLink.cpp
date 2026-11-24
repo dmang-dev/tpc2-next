@@ -115,8 +115,9 @@ bridge::Frame BridgeLink::transact(bridge::Command command,
             break;
         if (frame->sequence != request.sequence)
             continue; // stale response from an earlier cancelled transaction
-        if (frame->command != static_cast<uint8_t>(
-                static_cast<uint8_t>(command) | 0x80))
+        // The decoder strips the 0x80 response bit into frame->response, so
+        // compare against the plain command value.
+        if (!frame->response || frame->command != static_cast<uint8_t>(command))
             continue;
         raiseForStatus(*frame);
         return *frame;
@@ -208,6 +209,13 @@ void BridgeLink::reset()
 {
     if (isOpen())
         transact(bridge::Command::Reset, {}, transactionTimeout_);
+}
+
+void BridgeLink::setTimeouts(std::chrono::milliseconds transaction,
+                             std::chrono::milliseconds block)
+{
+    transactionTimeout_ = transaction;
+    blockTimeout_ = block;
 }
 
 std::string BridgeLink::description() const
