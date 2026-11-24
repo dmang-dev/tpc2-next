@@ -242,8 +242,39 @@ endif()
 
 if(TPC2_BUILD_TESTS)
     enable_testing()
+
+    # Pin-level V64 model plus the Pico firmware compiled for the host against
+    # a GPIO simulator, so ParallelLink, BridgeLink and the firmware's own
+    # parallel code are tested end to end. See tests/v64/v64_model.h.
+    enable_language(C)
+    add_library(tpc2_v64sim STATIC
+        tests/v64/v64_model.h
+        tests/v64/v64_model.c
+        tests/v64/V64Sim.h
+        tests/v64/V64Sim.cpp
+        tests/v64/FakePicoTransport.h
+        tests/v64/FakePicoTransport.cpp
+        tests/v64/pico_sim.h
+        tests/v64/pico_sim.c
+        firmware/pico/bridge.h
+        firmware/pico/bridge.c
+        firmware/pico/parallel.h
+        firmware/pico/parallel.c
+    )
+    set_target_properties(tpc2_v64sim PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED ON
+        AUTOMOC OFF)
+    target_include_directories(tpc2_v64sim
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tests/v64
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/v64/pico_host
+            ${CMAKE_CURRENT_SOURCE_DIR}/firmware/pico)
+    target_link_libraries(tpc2_v64sim PUBLIC tpc2core)
+    target_compile_options(tpc2_v64sim PRIVATE ${TPC2_WARNINGS})
+
     add_executable(tpc2_tests tests/main.cpp)
-    target_link_libraries(tpc2_tests PRIVATE tpc2core)
+    target_link_libraries(tpc2_tests PRIVATE tpc2core tpc2_v64sim)
     target_compile_options(tpc2_tests PRIVATE ${TPC2_WARNINGS})
     add_test(NAME tpc2-tests COMMAND tpc2_tests)
 
