@@ -60,16 +60,21 @@ void parallel_write_data(uint8_t value)
 
 uint8_t parallel_read_status(void)
 {
+    // A PC status register inverts only BUSY (bit 7). nACK (bit 6) and
+    // nERROR (bit 3) read the pin level directly, and the 74LVC245 buffers
+    // do not invert either. Bits 3..6 carry the nibbles of every byte the V64
+    // sends, and bit 3 is the new-mode sync line, so any extra inversion
+    // here corrupts reads (XOR 0x99) and breaks the new handshake.
     uint8_t value = 0;
     if (!gpio_get(TPC2_PIN_BUSY))
         value |= STATUS_BUSY;
-    if (!gpio_get(TPC2_PIN_ACK))
+    if (gpio_get(TPC2_PIN_ACK))
         value |= STATUS_ACK;
     if (gpio_get(TPC2_PIN_PE))
         value |= STATUS_PE;
     if (gpio_get(TPC2_PIN_SLCT))
         value |= STATUS_SLCT;
-    if (!gpio_get(TPC2_PIN_ERROR))
+    if (gpio_get(TPC2_PIN_ERROR))
         value |= STATUS_ERROR;
     return value;
 }
@@ -107,8 +112,14 @@ void parallel_init(void)
         gpio_set_dir(pin, GPIO_OUT);
     }
 
+    // gpio_init() leaves a pin as an input; STROBE and INIT are push-pull
+    // outputs, so set their idle levels (both high) and enable the drivers.
     gpio_init(TPC2_PIN_STROBE);
+    gpio_put(TPC2_PIN_STROBE, 1);
+    gpio_set_dir(TPC2_PIN_STROBE, GPIO_OUT);
     gpio_init(TPC2_PIN_INIT);
+    gpio_put(TPC2_PIN_INIT, 1);
+    gpio_set_dir(TPC2_PIN_INIT, GPIO_OUT);
     gpio_init(TPC2_PIN_AUTOFD);
     gpio_init(TPC2_PIN_SELECTIN);
 
