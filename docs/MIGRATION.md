@@ -277,7 +277,11 @@ PROTOCOL.md does not settle these points. Each is marked `[A]` in
   not derived from a V64 BIOS.
 - Windows InpOut driver installation.
 - Linux port permissions.
-- `QtSerialTransport` against a real or virtual COM port.
+- `QtSerialTransport` against a real or virtual COM port. The bridge protocol
+  above it is covered through `FakePicoTransport`. On Windows 11 with Secure
+  Boot, com0com 3.0.0.0 installs but its driver does not load (Device Manager
+  code 52, unsigned driver), so a virtual COM pair needs another signed
+  null-modem driver, or a Linux pty pair.
 - Pico firmware on physical hardware. The firmware compiles cleanly with Pico
   SDK 2.1.1 and Arm GCC 16.2.0, and the host build exercises its protocol
   logic. It has not been flashed onto a board or connected to a V64 in this

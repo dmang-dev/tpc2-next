@@ -431,7 +431,16 @@ endif()
 # windeployqt copies Qt and its plugins, but not the MinGW runtime or the
 # third-party libraries those DLLs link against (freetype, ICU, libjpeg, ...).
 # Resolve the complete runtime dependency set and add the non-Windows DLLs.
-if(WIN32 AND MINGW)
+set(_tpc2_install_executables)
+foreach(_target tpc2 tpc2cli)
+    if(TARGET ${_target})
+        list(APPEND _tpc2_install_executables "$<TARGET_FILE:${_target}>")
+    endif()
+endforeach()
+if(WIN32 AND MINGW AND _tpc2_install_executables)
+    # Only the executables this configuration builds; a GUI-less or CLI-less
+    # build must not reference a target that does not exist.
+    install(CODE "set(_tpc2_install_executables [[${_tpc2_install_executables}]])")
     install(CODE [[
         if(POLICY CMP0207)
             cmake_policy(SET CMP0207 NEW)
@@ -443,7 +452,7 @@ if(WIN32 AND MINGW)
             list(APPEND _tpc2_dep_args MODULES ${_tpc2_qt_plugins})
         endif()
         file(GET_RUNTIME_DEPENDENCIES
-            EXECUTABLES "$<TARGET_FILE:tpc2>" "$<TARGET_FILE:tpc2cli>"
+            EXECUTABLES ${_tpc2_install_executables}
             ${_tpc2_dep_args}
             RESOLVED_DEPENDENCIES_VAR _tpc2_runtime
             UNRESOLVED_DEPENDENCIES_VAR _tpc2_unresolved
